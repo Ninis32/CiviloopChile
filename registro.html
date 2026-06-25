@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro - CiviLoop Chile</title>
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+<div class="auth-container">
+
+    <div class="logo">
+        ♻️
+    </div>
+
+    <h1>CiviLoop <span>Chile</span></h1>
+
+    <p class="subtitulo">
+        Crea tu cuenta y comienza a reciclar
+    </p>
+
+    <div class="tabs">
+        <button onclick="window.location='index.html'">
+            Iniciar sesión
+        </button>
+
+        <button class="activo">
+            Registrarse
+        </button>
+    </div>
+
+    <form id="registroForm">
+
+        <label>Nombre completo</label>
+        <input
+            type="text" id="nombre"
+            placeholder="Ej: Juan Pérez"
+        >
+
+        <label>Correo electrónico</label>
+        <input
+            type="email" id="correo"
+            placeholder="tu@correo.cl"
+        >
+
+        <label>Contraseña</label>
+        <input
+            type="password" id="password"
+            placeholder="********"
+        >
+
+        <label>Confirmar contraseña</label>
+        <input
+            type="password"
+            placeholder="********"
+        >
+
+        <label>región</label>
+        <select id="region">
+            <option>Selecciona una región</option>
+            <option>Región Metropolitana</option>
+            <option>Valparaíso</option>
+            <option>Biobío</option>
+            <option>La Araucanía</option>
+            <option>Los Lagos</option>
+        </select>
+
+        <button class="btn-login">
+            Crear Cuenta
+        </button>
+
+    </form>
+
+</div>
+<script src="script.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,365 @@
+/* ==========================
+   RESET
+========================== */
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ==========================
+   BODY
+========================== */
+
+body{
+    background:#2d7a4f;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:20px;
+}
+
+/* ==========================
+   CONTENEDOR PRINCIPAL
+========================== */
+
+.auth-container{
+    width:100%;
+    max-width:420px;
+    background:#ffffff;
+    padding:35px;
+    border-radius:25px;
+    box-shadow:0 15px 40px rgba(0,0,0,.15);
+}
+
+/* ==========================
+   LOGO
+========================== */
+
+.logo{
+    text-align:center;
+    font-size:60px;
+    margin-bottom:10px;
+}
+
+/* ==========================
+   TITULOS
+========================== */
+
+h1{
+    text-align:center;
+    color:#1f5f3b;
+    margin-bottom:8px;
+}
+
+h1 span{
+    color:#66e39d;
+}
+
+.subtitulo{
+    text-align:center;
+    color:#666;
+    margin-bottom:25px;
+}
+
+/* ==========================
+   TABS LOGIN / REGISTRO
+========================== */
+
+.tabs{
+    display:flex;
+    gap:10px;
+    margin-bottom:25px;
+}
+
+.tabs button{
+    flex:1;
+    padding:12px;
+    border-radius:10px;
+    border:2px solid #d9d9d9;
+    background:white;
+    cursor:pointer;
+    font-size:15px;
+}
+
+.tabs button:hover{
+    transition:.3s;
+    background:#f4f4f4;
+}
+
+.tabs .activo{
+    border-color:#2d7a4f;
+    color:#2d7a4f;
+    font-weight:bold;
+}
+
+/* ==========================
+   FORMULARIOS
+========================== */
+
+form{
+    width:100%;
+}
+
+label{
+    display:block;
+    margin-top:15px;
+    margin-bottom:6px;
+    color:#555;
+    font-weight:500;
+}
+
+input,
+select,
+textarea{
+    width:100%;
+    padding:14px;
+    border:1px solid #cccccc;
+    border-radius:10px;
+    font-size:15px;
+    outline:none;
+}
+
+input:focus,
+select:focus,
+textarea:focus{
+    border-color:#2d7a4f;
+}
+
+textarea{
+    min-height:100px;
+    resize:none;
+}
+
+/* ==========================
+   BOTON PRINCIPAL
+========================== */
+
+.btn-login{
+    width:100%;
+    padding:15px;
+    margin-top:20px;
+    border:none;
+    border-radius:10px;
+    background:#2d7a4f;
+    color:white;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+.btn-login:hover{
+    background:#24633f;
+    transition:.3s;
+}
+
+/* ==========================
+   BOTON ADMIN
+========================== */
+
+.btn-admin{
+    width:100%;
+    padding:15px;
+    border:2px solid #2d7a4f;
+    background:white;
+    color:#2d7a4f;
+    border-radius:10px;
+    font-size:15px;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+.btn-admin:hover{
+    background:#f3fff7;
+    transition:.3s;
+}
+
+/* ==========================
+   SEPARADOR
+========================== */
+
+.separador{
+    margin:20px 0;
+    text-align:center;
+    color:#777;
+}
+
+.separador::before,
+.separador::after{
+    content:"";
+    display:inline-block;
+    width:40%;
+    height:1px;
+    background:#ddd;
+    vertical-align:middle;
+}
+
+.separador span{
+    margin:0 10px;
+}
+
+/* ==========================
+   LINKS
+========================== */
+
+.auth-container a{
+    display:block;
+    text-align:center;
+    margin-top:18px;
+    text-decoration:none;
+    color:#2d7a4f;
+}
+
+a:hover{
+    text-decoration:underline;
+}
+
+/* ==========================
+   DASHBOARD
+========================== */
+
+.stats-card{
+    background:#2d7a4f;
+    color:white;
+    border-radius:15px;
+    padding:20px;
+    margin-bottom:20px;
+    text-align:center;
+}
+
+.stats-card h2{
+    font-size:32px;
+}
+
+.stats-card p{
+    margin-top:5px;
+}
+
+.menu-dashboard{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+
+.menu-dashboard button{
+    padding:15px;
+    border:none;
+    border-radius:10px;
+    background:#2d7a4f;
+    color:white;
+    cursor:pointer;
+    font-size:15px;
+    font-weight:bold;
+}
+
+.menu-dashboard button:hover{
+    background:#24633f;
+}
+
+/* ==========================
+   BENEFICIOS
+========================== */
+
+.puntos-box{
+    background:#2d7a4f;
+    color:white;
+    text-align:center;
+    padding:18px;
+    border-radius:15px;
+    margin-bottom:20px;
+}
+
+.beneficio{
+    border:1px solid #ddd;
+    border-radius:12px;
+    padding:15px;
+    margin-bottom:15px;
+}
+
+.beneficio h3{
+    color:#2d7a4f;
+    margin-bottom:8px;
+}
+
+.beneficio p{
+    color:#555;
+    margin-bottom:5px;
+}
+
+.beneficio button{
+    width:100%;
+    margin-top:10px;
+    padding:12px;
+    border:none;
+    border-radius:8px;
+    background:#2d7a4f;
+    color:white;
+    cursor:pointer;
+    font-weight:bold;
+}
+
+.beneficio button:hover{
+    background:#24633f;
+}
+
+/* ==========================
+   RESPONSIVE
+========================== */
+
+@media(max-width:480px){
+
+    .auth-container{
+        padding:25px;
+    }
+
+    h1{
+        font-size:28px;
+    }
+
+    .logo{
+        font-size:50px;
+    }
+}
+/* DASHBOARD */
+
+header h2{
+    color: white;
+    text-align: center;
+    font-size: 36px;
+}
+
+nav{
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin: 25px 0;
+}
+
+nav a{
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+nav a:hover{
+    color: #d4ffd4;
+}
+
+.hero{
+    text-align: center;
+    margin-top: 40px;
+}
+
+.hero h1{
+    color: white;
+    font-size: 48px;
+}
+
+.hero p{
+    color: #d4ffd4;
+    font-size: 20px;
+}

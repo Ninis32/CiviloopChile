@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CiviLoop Chile</title>
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+<div class="auth-container">
+
+    <div class="logo">
+        ♻️
+    </div>
+
+    <h1>CiviLoop <span>Chile</span></h1>
+
+    <p class="subtitulo">
+        Recicla, acumula puntos y gana beneficios
+    </p>
+
+    <div class="tabs">
+        <button class="activo">Iniciar sesión</button>
+
+        <button onclick="window.location='registro.html'">
+            Registrarse
+        </button>
+    </div>
+
+    <form>
+
+        <label>Correo electrónico</label>
+
+        <input
+            id="correo"
+            type="email"
+            placeholder="tu@correo.cl"
+            required
+        >
+
+        <label>Contraseña</label>
+
+        <input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            required
+        >
+
+        <button type="submit" class="btn-login">
+            Entrar
+        </button>
+    
+
+    </form>
+
+    <div class="separador">
+        <span>o</span>
+    </div>
+
+    <button class="btn-admin">
+        Entrar como Administrador
+    </button>
+
+    <a href="#">
+        ¿Olvidaste tu contraseña?
+    </a>
+
+</div>
+<script src="login.js"></script>
+</body>
+</html>
