@@ -1,132 +1,214 @@
-const express  = require("express");
-const mongoose = require("mongoose");
-const cors     = require("cors");
-const bcrypt   = require("bcryptjs");
+const express   = require("express");
+const mongoose  = require("mongoose");
+const cors      = require("cors");
+const bcrypt    = require("bcryptjs");
+const jwt       = require("jsonwebtoken");
+const path      = require("path");
 require("dotenv").config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ── Servir archivos estaticos (HTML, CSS, JS) ──────────────
+app.use(express.static(path.join(__dirname)));
 
-// ── Conexión MongoDB Atlas ────────────────────────────────
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log("✓ MongoDB conectado"))
-  .catch(err => console.log("✗ Error MongoDB:", err));
+  .then(() => console.log("MongoDB conectado"))
+  .catch(err => console.log("Error:", err));
 
-  mongoose.connection.once("open", ()=> {
-    console.log("BASE DE DATOS:", mongoose.connection.name);
-  });
+const Usuario = mongoose.model("Usuario", new mongoose.Schema({
+  nombre:         { type: String, required: true },
+  correo:         { type: String, required: true, unique: true },
+  password:       { type: String, required: true },
+  region:         { type: String, required: true },
+  rol:            { type: String, default: "ciudadano" },
+  puntos_totales: { type: Number, default: 0 },
+  fecha_registro: { type: Date,   default: Date.now },
+  activo:         { type: Boolean, default: true }
+}));
 
-// ── Modelo Usuario ────────────────────────────────────────
-const usuarioSchema = new mongoose.Schema({
-  nombre:   { type: String, required: true },
-  correo:   { type: String, required: true, unique: true },
-  password: { type: String, required: true },  // guardará el HASH
-  region:   { type: String, required: true },
-  rol:              { type: String, default: "ciudadano" },
-  puntos_totales:   { type: Number, default: 0 },
-  fecha_registro:   { type: Date,   default: Date.now },
-  activo:           { type: Boolean, default: true }
-});
+const PuntoLimpio = mongoose.model("PuntoLimpio", new mongoose.Schema({
+  nombre_punto: { type: String, required: true },
+  direccion:    { type: String, required: true },
+  lat:          Number,
+  lng:          Number,
+  codigo_qr:    { type: String, unique: true },
+  materiales:   [String],
+  activo:       { type: Boolean, default: true }
+}));
 
-const Usuario = mongoose.model("Usuario", usuarioSchema);
+const Beneficio = mongoose.model("Beneficio", new mongoose.Schema({
+  titulo:            String,
+  descripcion:       String,
+  puntos_requeridos: { type: Number, required: true },
+  stock:             { type: Number, default: 0 },
+  activo:            { type: Boolean, default: true }
+}));
 
-// ── GET / ─────────────────────────────────────────────────
-app.get("/", (req, res) => {
-  res.send("CiviLoop Chile API funcionando");
-});
-app.get("/test", async (req, res) => {
-  const usuarios = await Usuario.find();
-  console.log(usuarios);
-  res.json(usuarios);
-});
+const Historial = mongoose.model("Historial", new mongoose.Schema({
+  id_usuario:     { type: mongoose.Schema.Types.ObjectId, ref: "Usuario" },
+  id_punto:       { type: mongoose.Schema.Types.ObjectId, ref: "PuntoLimpio" },
+  nombre_punto:   String,
+  tipo_material:  String,
+  cantidad:       Number,
+  puntos_ganados: Number,
+  observaciones:  String,
+  fecha_actividad:{ type: Date, default: Date.now }
+}));
 
-// ── POST /registro ────────────────────────────────────────
+const Canje = mongoose.model("Canje", new mongoose.Schema({
+  id_usuario:        { type: mongoose.Schema.Types.ObjectId, ref: "Usuario" },
+  id_beneficio:      { type: mongoose.Schema.Types.ObjectId, ref: "Beneficio" },
+  puntos_utilizados: Number,
+  fecha_canje:       { type: Date, default: Date.now },
+  estado_canje:      { type: String, default: "pendiente" }
+}));
+
+function verificarJWT(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ mensaje: "Token requerido" });
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ mensaje: "Token invalido o expirado" });
+  }
+}
+
 app.post("/registro", async (req, res) => {
   try {
     const { nombre, correo, password, region } = req.body;
-
-    // 1. Validar que no falten campos
-    if (!nombre || !correo || !password || !region) {
+    if (!nombre || !correo || !password || !region)
       return res.status(400).json({ mensaje: "Todos los campos son obligatorios" });
-    }
-
-    // 2. Verificar si el correo ya existe
-    const existe = await Usuario.findOne({ correo });
-    if (existe) {
-      return res.status(400).json({ mensaje: "El correo ya está registrado" });
-    }
-
-    // 3. Cifrar la contraseña con bcrypt (12 = factor de costo)
+    if (await Usuario.findOne({ correo }))
+      return res.status(400).json({ mensaje: "El correo ya esta registrado" });
     const hash = await bcrypt.hash(password, 12);
-
-    // 4. Guardar usuario con el hash, NO con la contraseña en texto plano
-    const nuevoUsuario = new Usuario({
-      nombre,
-      correo,
-      password: hash,   
-      region
-    });
-
-    await nuevoUsuario.save();
-
-    const total = await Usuario.countDocuments();
-    console.log("✓ Usuario registrado. Total:", total);
-
+    await new Usuario({ nombre, correo, password: hash, region }).save();
     res.json({ mensaje: "Usuario registrado correctamente" });
-
-  } catch (error) {
-    console.log("✗ Error registro:", error);
-    res.status(500).json({ mensaje: "Error al guardar usuario" });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al registrar usuario" });
   }
 });
 
-// ── POST /login ───────────────────────────────────────────
 app.post("/login", async (req, res) => {
   try {
     const { correo, password } = req.body;
-
-    // 1. Buscar usuario por correo
     const usuario = await Usuario.findOne({ correo });
-
-console.log("CORREO BUSCADO:", correo);
-console.log("USUARIO ENCONTRADO:", usuario);
-
-if (!usuario) {
-  return res.status(401).json({
-    mensaje: "Correo o contraseña incorrectos"
-  });
-}
-
-    // 2. Comparar contraseña ingresada con el hash guardado
-    const coincide = await bcrypt.compare(password, usuario.password);
-    if ( !coincide) {
-      return res.status(401).json({
-        mensaje: "correo o contraseña incorrecta"
-      })
-    };
-    
-  
-
-    // 3. Login exitoso
+    if (!usuario)
+      return res.status(401).json({ mensaje: "Correo o contrasena incorrectos" });
+    if (!usuario.activo)
+      return res.status(403).json({ mensaje: "Cuenta bloqueada" });
+    const ok = await bcrypt.compare(password, usuario.password);
+    console.log("PASSWORD OK:", ok);
+    if (!ok)
+      return res.status(401).json({ mensaje: "Correo o contrasena incorrectos" });
+    const token = jwt.sign(
+      { id: usuario._id, correo: usuario.correo, rol: usuario.rol },
+      process.env.JWT_SECRET,
+      { expiresIn: "8h" }
+    );
     res.json({
       mensaje: "Login exitoso",
+      token,
       usuario: {
-        nombre:        usuario.nombre,
-        correo:        usuario.correo,
-        region:        usuario.region,
-        puntos_totales:usuario.puntos_totales
+        nombre:         usuario.nombre,
+        correo:         usuario.correo,
+        region:         usuario.region,
+        rol:            usuario.rol,
+        puntos_totales: usuario.puntos_totales
       }
     });
-
-  } catch (error) {
-    console.log("✗ Error login:", error);
-    res.status(500).json({ mensaje: "Error al iniciar sesión" });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al iniciar sesion" });
   }
 });
 
-// ── Iniciar servidor ──────────────────────────────────────
+app.get("/perfil", verificarJWT, async (req, res) => {
+  try {
+    const usuario = await Usuario.findById(req.user.id).select("-password");
+    res.json(usuario);
+  } catch {
+    res.status(500).json({ mensaje: "Error al obtener perfil" });
+  }
+});
+
+app.get("/api/puntos-limpios", verificarJWT, async (req, res) => {
+  try {
+    const puntos = await PuntoLimpio.find({ activo: true });
+    res.json(puntos);
+  } catch {
+    res.status(500).json({ mensaje: "Error al obtener puntos limpios" });
+  }
+});
+
+app.get("/api/beneficios", verificarJWT, async (req, res) => {
+  try {
+    const beneficios = await Beneficio.find({ activo: true, stock: { $gt: 0 } });
+    res.json(beneficios);
+  } catch {
+    res.status(500).json({ mensaje: "Error al obtener beneficios" });
+  }
+});
+
+app.get("/api/historial", verificarJWT, async (req, res) => {
+  try {
+    const historial = await Historial
+      .find({ id_usuario: req.user.id })
+      .sort({ fecha_actividad: -1 })
+      .limit(20);
+    res.json(historial);
+  } catch {
+    res.status(500).json({ mensaje: "Error al obtener historial" });
+  }
+});
+
+app.post("/api/reciclaje/qr", verificarJWT, async (req, res) => {
+  try {
+    const { tipo_material, cantidad, id_punto, codigo_qr, observaciones } = req.body;
+    const punto = await PuntoLimpio.findOne({ _id: id_punto, codigo_qr, activo: true });
+    if (!punto) return res.status(404).json({ mensaje: "QR o punto limpio invalido" });
+    const puntos_ganados = Math.max(5, Math.round((cantidad || 1) * 5));
+    await new Historial({
+      id_usuario: req.user.id,
+      id_punto:   punto._id,
+      nombre_punto: punto.nombre_punto,
+      tipo_material, cantidad, puntos_ganados, observaciones
+    }).save();
+    await Usuario.findByIdAndUpdate(req.user.id, { $inc: { puntos_totales: puntos_ganados } });
+    res.json({ mensaje: "Reciclaje registrado", puntos_ganados });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al registrar reciclaje" });
+  }
+});
+
+app.post("/api/canjes", verificarJWT, async (req, res) => {
+  try {
+    const { id_beneficio } = req.body;
+    const beneficio = await Beneficio.findOne({ _id: id_beneficio, activo: true, stock: { $gt: 0 } });
+    if (!beneficio) return res.status(400).json({ mensaje: "Beneficio no disponible" });
+    const usuario = await Usuario.findById(req.user.id);
+    if (usuario.puntos_totales < beneficio.puntos_requeridos)
+      return res.status(400).json({ mensaje: "Puntos insuficientes" });
+    await Usuario.findByIdAndUpdate(req.user.id, { $inc: { puntos_totales: -beneficio.puntos_requeridos } });
+    await Beneficio.findByIdAndUpdate(id_beneficio, { $inc: { stock: -1 } });
+    await new Canje({ id_usuario: req.user.id, id_beneficio, puntos_utilizados: beneficio.puntos_requeridos }).save();
+    res.json({ mensaje: "Canje realizado con exito" });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al realizar canje" });
+  }
+});
+
+// Ruta raiz → sirve index.html
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
 app.listen(process.env.PORT || 3000, () => {
-  console.log("✓ Servidor iniciado en puerto", process.env.PORT || 3000);
+  console.log("Servidor en puerto", process.env.PORT || 3000);
+  console.log("Abre: http://localhost:3000");
 });
