@@ -21,6 +21,8 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     console.log("DATOS:", datos);
 
     if (respuesta.ok) {
+        localStorage.setItem("token", datos.token);
+        localStorage.setItem("usuario", JSON.stringify(datos.usuario));
         alert("Bienvenido");
         window.location = "dashboard.html";
     } else {
