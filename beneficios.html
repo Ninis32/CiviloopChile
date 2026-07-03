@@ -1,50 +1,124 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Beneficios</title>
-
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beneficios – CiviLoop Chile</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <div class="auth-container">
 
-    <div class="logo">🎁</div>
+  <div class="logo">🎁</div>
+  <h1>CiviLoop <span>Chile</span></h1>
+  <p class="subtitulo">Beneficios disponibles</p>
 
-    <h1>CiviLoop <span>Chile</span></h1>
+  <div class="puntos-box">
+    <h2 id="mis-puntos">— Puntos Disponibles</h2>
+  </div>
 
-    <p class="subtitulo">
-        Beneficios disponibles
-    </p>
+  <div id="lista-beneficios">
+    <p style="color:#888;font-size:0.85rem">Cargando beneficios...</p>
+  </div>
 
-    <div class="puntos-box">
-        <h2>250 Puntos Disponibles</h2>
-    </div>
-
-    <div class="beneficio">
-        <h3>☕ Starbucks</h3>
-        <p>Café mediano gratis</p>
-        <p>100 puntos</p>
-        <button>Canjear</button>
-    </div>
-
-    <div class="beneficio">
-        <h3>🛒 Lider</h3>
-        <p>Descuento de $5.000</p>
-        <p>150 puntos</p>
-        <button>Canjear</button>
-    </div>
-
-    <div class="beneficio">
-        <h3>🎬 Cinemark</h3>
-        <p>Entrada al cine</p>
-        <p>180 puntos</p>
-        <button>Canjear</button>
-    </div>
+  <a href="dashboard.html" style="margin-top:1rem;display:block;text-align:center;color:#2E8B57;font-size:0.85rem">
+    ← Volver al inicio
+  </a>
 
 </div>
 
+<!-- Toast de notificación -->
+<div id="toast" style="display:none;position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);
+  background:#1A5C35;color:white;padding:0.6rem 1.4rem;border-radius:20px;font-size:0.85rem;z-index:999">
+</div>
+
+<script>
+  const token   = localStorage.getItem("token")
+  const usuario = JSON.parse(localStorage.getItem("usuario") || "null")
+  if (!token || !usuario) window.location.href = "index.html"
+
+  document.getElementById("mis-puntos").textContent = usuario.puntos_totales + " Puntos Disponibles"
+
+  // Cargar beneficios desde MongoDB
+  async function cargarBeneficios() {
+    try {
+      const res  = await fetch("http://localhost:3000/api/beneficios", {
+        headers: { "Authorization": "Bearer " + token }
+      })
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.mensaje)
+
+      const contenedor = document.getElementById("lista-beneficios")
+
+      if (data.length === 0) {
+        contenedor.innerHTML = "<p style='color:#888;font-size:0.85rem'>No hay beneficios disponibles por ahora.</p>"
+        return
+      }
+
+      contenedor.innerHTML = data.map(b => {
+        const puedeCanjear = usuario.puntos_totales >= b.puntos_requeridos && b.stock > 0
+        return `
+          <div class="beneficio">
+            <h3>${b.titulo || b.descripcion}</h3>
+            <p>${b.descripcion}</p>
+            <p style="color:#2E8B57;font-weight:600">${b.puntos_requeridos} puntos</p>
+            <p style="font-size:0.75rem;color:#aaa">Stock: ${b.stock} disponibles</p>
+            <button
+              onclick="canjear('${b._id}', ${b.puntos_requeridos})"
+              ${puedeCanjear ? "" : "disabled"}
+              style="${puedeCanjear ? "" : "opacity:0.4;cursor:not-allowed"}">
+              ${puedeCanjear ? "Canjear" : "Puntos insuficientes"}
+            </button>
+          </div>
+        `
+      }).join("")
+
+    } catch (err) {
+      document.getElementById("lista-beneficios").innerHTML =
+        "<p style='color:#888;font-size:0.85rem'>Error al cargar beneficios.</p>"
+    }
+  }
+
+  // Canjear un beneficio
+  async function canjear(id_beneficio, puntos) {
+    if (!confirm(`¿Canjear por ${puntos} puntos?`)) return
+
+    try {
+      const res  = await fetch("http://localhost:3000/api/canjes", {
+        method:  "POST",
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({ id_beneficio })
+      })
+      const data = await res.json()
+
+      if (res.ok) {
+        // Actualizar puntos en localStorage
+        usuario.puntos_totales -= puntos
+        localStorage.setItem("usuario", JSON.stringify(usuario))
+        document.getElementById("mis-puntos").textContent = usuario.puntos_totales + " Puntos Disponibles"
+        mostrarToast("✓ " + data.mensaje)
+        cargarBeneficios() // recargar lista
+      } else {
+        mostrarToast("✗ " + data.mensaje)
+      }
+    } catch {
+      mostrarToast("✗ Error de conexión")
+    }
+  }
+
+  function mostrarToast(msg) {
+    const t = document.getElementById("toast")
+    t.textContent = msg
+    t.style.display = "block"
+    setTimeout(() => t.style.display = "none", 3000)
+  }
+
+  cargarBeneficios()
+</script>
 </body>
 </html>
