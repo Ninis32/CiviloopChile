@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa – CiviLoop Chile</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    body { margin:0; padding:0; display:flex; flex-direction:column; height:100vh; }
+    .top-bar {
+      background:#1A5C35; color:white; padding:0.75rem 1rem;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .top-bar h1 { font-size:1rem; margin:0; }
+    .top-bar a  { color:white; font-size:0.8rem; text-decoration:none; opacity:0.85; }
+    .contenedor { display:flex; flex:1; overflow:hidden; }
+    .panel {
+      width:280px; background:white; overflow-y:auto;
+      border-right:1px solid #e0e0e0; padding:0.75rem;
+    }
+    .panel h3   { color:#1A5C35; font-size:0.9rem; margin-bottom:0.5rem; }
+    .btn-loc    {
+      width:100%; padding:0.5rem; background:#2E8B57; color:white;
+      border:none; border-radius:8px; cursor:pointer; font-size:0.82rem;
+      margin-bottom:0.75rem; font-weight:600;
+    }
+    .btn-loc:hover { background:#1A5C35; }
+    .punto-card {
+      padding:0.6rem; border-radius:8px; border:1px solid #eee;
+      margin-bottom:6px; cursor:pointer; transition:all .15s;
+    }
+    .punto-card:hover  { border-color:#2E8B57; background:#f9fff9; }
+    .punto-card.activo { border-color:#2E8B57; background:#e8f5e9; }
+    .punto-nombre { font-weight:600; font-size:0.85rem; color:#1A5C35; }
+    .punto-dir    { font-size:0.75rem; color:#888; margin:2px 0; }
+    .punto-dist   { font-size:0.72rem; color:#2E8B57; font-weight:500; }
+    .mat-tag      {
+      display:inline-block; font-size:0.65rem; padding:1px 6px;
+      border-radius:20px; background:#e8f5e9; color:#1A5C35;
+      border:1px solid #c8e6c9; margin:2px 2px 0 0;
+    }
+    #mapa { flex:1; }
+    .popup-btn {
+      display:block; width:100%; padding:5px; background:#2E8B57;
+      color:white; border:none; border-radius:6px; cursor:pointer;
+      margin-top:6px; font-size:0.8rem; font-weight:600;
+    }
+    #toast {
+      position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%);
+      background:#1A5C35; color:white; padding:0.5rem 1.2rem;
+      border-radius:20px; font-size:0.82rem; display:none; z-index:9999;
+    }
+    @media(max-width:600px) {
+      .contenedor { flex-direction:column; }
+      .panel { width:100%; max-height:200px; border-right:none; border-bottom:1px solid #eee; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>📍 Puntos Limpios – CiviLoop Chile</h1>
+  <a href="dashboard.html">← Inicio</a>
+</div>
+
+<div class="contenedor">
+  <div class="panel">
+    <h3>Puntos cercanos</h3>
+    <button class="btn-loc" onclick="obtenerUbicacion()">🎯 Usar mi ubicación</button>
+    <div id="listaPuntos">
+      <p style="color:#aaa;font-size:0.8rem">Haz clic en "Usar mi ubicación" para ver los puntos más cercanos.</p>
+    </div>
+  </div>
+  <div id="mapa"></div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const token   = localStorage.getItem("token")
+  const usuario = JSON.parse(localStorage.getItem("usuario") || "null")
+  if (!token || !usuario) window.location.href = "index.html"
+
+  // Inicializar mapa centrado en Santiago
+  const mapa = L.map("mapa").setView([-33.4489, -70.6693], 12)
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap"
+  }).addTo(mapa)
+
+  const iconoVerde = L.divIcon({
+    html: '<div style="background:#2E8B57;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>',
+    iconSize:[28,28], iconAnchor:[14,28], popupAnchor:[0,-28], className:""
+  })
+  const iconoUser = L.divIcon({
+    html: '<div style="background:#1565C0;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 0 0 3px rgba(21,101,192,0.3)"></div>',
+    iconSize:[16,16], iconAnchor:[8,8], className:""
+  })
+
+  let puntos       = []
+  let marcadores   = []
+  let markerUsuario = null
+  let posUsuario   = null
+
+  // Cargar puntos desde MongoDB
+  async function cargarPuntos() {
+    try {
+      const res  = await fetch("http://localhost:3000/api/puntos-limpios", {
+        headers: { "Authorization": "Bearer " + token }
+      })
+      puntos = await res.json()
+
+      // Si no hay puntos en BD usar datos de ejemplo
+      if (!puntos.length) {
+        puntos = [
+          { _id:"1", nombre_punto:"Punto Limpio Plaza Italia",    direccion:"Av. O'Higgins 3450", lat:-33.4489, lng:-70.6467, materiales:["Plástico","Vidrio"] },
+          { _id:"2", nombre_punto:"Punto Limpio Providencia",     direccion:"Av. Providencia 1234", lat:-33.4317, lng:-70.6147, materiales:["Metal","Papel"] },
+          { _id:"3", nombre_punto:"Punto Limpio Las Condes",      direccion:"Av. Apoquindo 5000", lat:-33.4094, lng:-70.5738, materiales:["Vidrio","Cartón"] },
+        ]
+      }
+
+      puntos.forEach(p => {
+        const m = L.marker([p.lat, p.lng], { icon: iconoVerde }).addTo(mapa)
+        m.bindPopup(`
+          <div style="min-width:180px">
+            <b style="color:#1A5C35">♻️ ${p.nombre_punto}</b>
+            <p style="font-size:0.8rem;color:#666;margin:4px 0">📍 ${p.direccion}</p>
+            <div style="margin:4px 0">
+              ${(p.materiales||[]).map(m=>`<span style="font-size:0.68rem;padding:1px 6px;border-radius:20px;background:#e8f5e9;color:#1A5C35;border:1px solid #c8e6c9">${m}</span>`).join(" ")}
+            </div>
+            <button class="popup-btn" onclick="navegar(${p.lat},${p.lng})">🗺️ Cómo llegar</button>
+          </div>
+        `)
+        marcadores.push({ m, p })
+      })
+
+      renderLista(puntos)
+    } catch {
+      toast("Error al cargar puntos limpios")
+    }
+  }
+
+  function obtenerUbicacion() {
+    if (!navigator.geolocation) { toast("Tu navegador no soporta geolocalización"); return; }
+    toast("Obteniendo ubicación...")
+    navigator.geolocation.getCurrentPosition(pos => {
+      posUsuario = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      if (markerUsuario) markerUsuario.remove()
+      markerUsuario = L.marker([posUsuario.lat, posUsuario.lng], { icon: iconoUser })
+        .addTo(mapa).bindPopup("<b>📍 Tu ubicación</b>").openPopup()
+      mapa.setView([posUsuario.lat, posUsuario.lng], 14)
+
+      const conDist = puntos.map(p => ({
+        ...p,
+        distancia: haversine(posUsuario.lat, posUsuario.lng, p.lat, p.lng)
+      })).sort((a,b) => a.distancia - b.distancia)
+
+      renderLista(conDist)
+      toast("✓ Ordenados por cercanía")
+    }, () => toast("No se pudo obtener tu ubicación"))
+  }
+
+  function haversine(lat1, lng1, lat2, lng2) {
+    const R    = 6371
+    const dLat = (lat2-lat1) * Math.PI/180
+    const dLng = (lng2-lng1) * Math.PI/180
+    const a    = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+  }
+
+  function renderLista(lista) {
+    document.getElementById("listaPuntos").innerHTML = lista.map((p,i) => `
+      <div class="punto-card ${i===0?"activo":""}" onclick="irA('${p._id}')">
+        <div class="punto-nombre">${i===0?"⭐ ":""}${p.nombre_punto}</div>
+        <div class="punto-dir">📍 ${p.direccion}</div>
+        ${p.distancia !== undefined ? `<div class="punto-dist">📏 ${p.distancia<1 ? Math.round(p.distancia*1000)+"m" : p.distancia.toFixed(1)+"km"} de ti</div>` : ""}
+        <div>${(p.materiales||[]).map(m=>`<span class="mat-tag">${m}</span>`).join("")}</div>
+      </div>
+    `).join("")
+  }
+
+  function irA(id) {
+    const found = marcadores.find(x => x.p._id === id)
+    if (found) {
+      mapa.setView([found.p.lat, found.p.lng], 16)
+      found.m.openPopup()
+      document.querySelectorAll(".punto-card").forEach(c => c.classList.remove("activo"))
+      event.currentTarget.classList.add("activo")
+    }
+  }
+
+  function navegar(lat, lng) {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, "_blank")
+  }
+
+  function toast(msg) {
+    const t = document.getElementById("toast")
+    t.textContent  = msg
+    t.style.display = "block"
+    setTimeout(() => t.style.display = "none", 2500)
+  }
+
+  cargarPuntos()
+</script>
+</body>
+</html>

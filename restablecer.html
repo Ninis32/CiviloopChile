@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Restablecer contraseña</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+<div class="login-container">
+
+    <h2>Restablecer contraseña</h2>
+
+    <form id="formRestablecer">
+
+        <input
+            type="password"
+            id="password"
+            placeholder="Nueva contraseña"
+            required
+        >
+
+        <input
+            type="password"
+            id="confirmar"
+            placeholder="Confirmar contraseña"
+            required
+        >
+
+        <button type="submit">
+            Cambiar contraseña
+        </button>
+
+    </form>
+
+    <br>
+
+    <a href="index.html">
+        Volver al inicio de sesión
+    </a>
+
+</div>
+
+<script>
+
+const token = new URLSearchParams(window.location.search).get("token");
+
+document.getElementById("formRestablecer").addEventListener("submit", async (e)=>{
+
+    e.preventDefault();
+
+    const password=document.getElementById("password").value;
+    const confirmar=document.getElementById("confirmar").value;
+
+    if(password!==confirmar){
+
+        alert("Las contraseñas no coinciden.");
+
+        return;
+
+    }
+
+    const respuesta=await fetch("/restablecer-password",{
+
+        method:"POST",
+
+        headers:{
+            "Content-Type":"application/json"
+        },
+
+        body:JSON.stringify({
+
+            token,
+
+            password
+
+        })
+
+    });
+
+    const datos=await respuesta.json();
+
+    alert(datos.mensaje);
+
+    if(respuesta.ok){
+
+        window.location="index.html";
+
+    }
+
+});
+
+</script>
+
+</body>
+</html>

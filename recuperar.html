@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Recuperar contraseña</title>
+
+    <link rel="stylesheet" href="css/style.css">
+
+</head>
+
+<body>
+
+<div class="login-container">
+
+    <h2>Recuperar contraseña</h2>
+
+    <p>Ingresa tu correo electrónico y te enviaremos un enlace para cambiar tu contraseña.</p>
+
+    <form id="formRecuperar">
+
+        <input
+            type="email"
+            id="correo"
+            placeholder="Correo electrónico"
+            required
+        >
+
+        <button type="submit">
+            Enviar enlace
+        </button>
+
+    </form>
+
+    <br>
+
+    <a href="index.html">
+        Volver al inicio de sesión
+    </a>
+
+</div>
+
+<script>
+
+document.getElementById("formRecuperar").addEventListener("submit", async (e)=>{
+
+    e.preventDefault();
+
+    const correo=document.getElementById("correo").value;
+
+    const respuesta=await fetch("/recuperar-password",{
+
+        method:"POST",
+
+        headers:{
+            "Content-Type":"application/json"
+        },
+
+        body:JSON.stringify({
+            correo
+        })
+
+    });
+
+    const datos=await respuesta.json();
+
+    alert(datos.mensaje);
+
+    if(respuesta.ok){
+
+        window.location="index.html";
+
+    }
+
+});
+
+</script>
+
+</body>
+
+</html>

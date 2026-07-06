@@ -4,13 +4,19 @@ const cors      = require("cors");
 const bcrypt    = require("bcryptjs");
 const jwt       = require("jsonwebtoken");
 const path      = require("path");
+const express  = require("express");
+const mongoose = require("mongoose");
+const cors     = require("cors");
+const bcrypt   = require("bcryptjs");
+const jwt      = require("jsonwebtoken");
+const path     = require("path");
+const axios    = require("axios");
+
 require("dotenv").config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// ── Servir archivos estaticos (HTML, CSS, JS) ──────────────
 app.use(express.static(path.join(__dirname)));
 
 mongoose.connect(process.env.MONGODB_URI)
@@ -76,6 +82,26 @@ function verificarJWT(req, res, next) {
   }
 }
 
+const Canje = mongoose.model("Canje", new mongoose.Schema({
+  id_usuario:        { type: mongoose.Schema.Types.ObjectId, ref: "Usuario" },
+  id_beneficio:      { type: mongoose.Schema.Types.ObjectId, ref: "Beneficio" },
+  puntos_utilizados: Number,
+  fecha_canje:       { type: Date, default: Date.now },
+  estado_canje:      { type: String, default: "pendiente" }
+}));
+
+// ── Middleware JWT ─────────────────────────────────────────
+function verificarJWT(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ mensaje: "Token requerido" });
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ mensaje: "Token invalido o expirado" });
+  }
+}
+
 app.post("/registro", async (req, res) => {
   try {
     const { nombre, correo, password, region } = req.body;
@@ -101,7 +127,7 @@ app.post("/login", async (req, res) => {
     if (!usuario.activo)
       return res.status(403).json({ mensaje: "Cuenta bloqueada" });
     const ok = await bcrypt.compare(password, usuario.password);
-    console.log("PASSWORD OK:", ok);
+
     if (!ok)
       return res.status(401).json({ mensaje: "Correo o contrasena incorrectos" });
     const token = jwt.sign(
@@ -126,6 +152,74 @@ app.post("/login", async (req, res) => {
   }
 });
 
+// ── POST /recuperar-password ───────────────────────────────
+app.post("/recuperar-password", async (req, res) => {
+  const { correo } = req.body;
+  try {
+    const usuario = await Usuario.findOne({ correo });
+
+    // Siempre responder igual (no revelar si el correo existe)
+    if (!usuario) {
+      return res.json({ mensaje: "Si el correo existe, recibirás un enlace." });
+    }
+
+    const token  = jwt.sign(
+      { id: usuario._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    const enlace = `http://localhost:3000/restablecer.html?token=${token}`;
+
+    await axios.post("https://api.brevo.com/v3/smtp/email",
+      {
+        sender:      { name: "Civiloop Chile", email: process.env.EMAIL_FROM },
+        to:          [{ email: correo }],
+        subject:     "Recuperar contraseña – Civiloop Chile",
+        htmlContent: `
+          <h2>Civiloop Chile ♻️</h2>
+          <p>Haz clic en el siguiente enlace para restablecer tu contraseña:</p>
+          <a href="${enlace}" style="background:#2E8B57;color:white;padding:10px 20px;
+            border-radius:8px;text-decoration:none;display:inline-block">
+            Restablecer contraseña
+          </a>
+          <p style="color:#888;font-size:0.85rem;margin-top:12px">
+            Este enlace vence en 15 minutos.
+          </p>
+        `
+      },
+      {
+        headers: {
+          "api-key":      process.env.BREVO_API_KEY,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    res.json({ mensaje: "Si el correo existe, recibirás un enlace." });
+
+  } catch (error) {
+    console.log(error.response?.data || error);
+    res.status(500).json({ mensaje: "Error enviando correo." });
+  }
+});
+
+// ── POST /restablecer-password ─────────────────────────────
+app.post("/restablecer-password", async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password)
+    return res.status(400).json({ mensaje: "Datos incompletos" });
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const hash    = await bcrypt.hash(password, 12);
+    await Usuario.findByIdAndUpdate(payload.id, { password: hash });
+    res.json({ mensaje: "Contrasena actualizada correctamente." });
+  } catch {
+    res.status(400).json({ mensaje: "El enlace es invalido o ya expiro." });
+  }
+});
+
+// ── GET /perfil ─
 app.get("/perfil", verificarJWT, async (req, res) => {
   try {
     const usuario = await Usuario.findById(req.user.id).select("-password");
@@ -135,6 +229,8 @@ app.get("/perfil", verificarJWT, async (req, res) => {
   }
 });
 
+
+// ── GET /api/puntos-limpios -
 app.get("/api/puntos-limpios", verificarJWT, async (req, res) => {
   try {
     const puntos = await PuntoLimpio.find({ activo: true });
@@ -172,8 +268,7 @@ app.post("/api/reciclaje/qr", verificarJWT, async (req, res) => {
     if (!punto) return res.status(404).json({ mensaje: "QR o punto limpio invalido" });
     const puntos_ganados = Math.max(5, Math.round((cantidad || 1) * 5));
     await new Historial({
-      id_usuario: req.user.id,
-      id_punto:   punto._id,
+
       nombre_punto: punto.nombre_punto,
       tipo_material, cantidad, puntos_ganados, observaciones
     }).save();
@@ -203,7 +298,6 @@ app.post("/api/canjes", verificarJWT, async (req, res) => {
   }
 });
 
-// Ruta raiz → sirve index.html
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });

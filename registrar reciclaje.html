@@ -1,60 +1,152 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Registrar Reciclaje</title>
-
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registrar Reciclaje – CiviLoop Chile</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <div class="auth-container">
 
-    <div class="logo">♻️</div>
+  <div class="logo">♻️</div>
+  <h1>CiviLoop <span>Chile</span></h1>
+  <p class="subtitulo">Registra tu reciclaje</p>
 
-    <h1>CiviLoop <span>Chile</span></h1>
+  <form id="form-reciclaje">
 
-    <p class="subtitulo">
-        Registra tu reciclaje
-    </p>
+    <label>Tipo de Material</label>
+    <select id="tipo_material" required>
+      <option value="">Seleccione</option>
+      <option value="Plástico">Plástico</option>
+      <option value="Vidrio">Vidrio</option>
+      <option value="Papel">Papel</option>
+      <option value="Cartón">Cartón</option>
+      <option value="Metal">Metal</option>
+    </select>
 
-    <form>
+    <label>Cantidad (Kg)</label>
+    <input type="number" id="cantidad" placeholder="Ej: 2" min="0.1" step="0.1" required>
 
-        <label>Tipo de Material</label>
-        <select>
-            <option>Seleccione</option>
-            <option>Plástico</option>
-            <option>Vidrio</option>
-            <option>Papel</option>
-            <option>Cartón</option>
-            <option>Metal</option>
-        </select>
+    <label>Punto Limpio</label>
+    <select id="id_punto" required>
+      <option value="">Cargando puntos...</option>
+    </select>
 
-        <label>Cantidad (Kg)</label>
-        <input type="number" placeholder="Ej: 2">
+    <label>Código QR del punto</label>
+    <input type="text" id="codigo_qr" placeholder="QR-00001" required>
 
-        <label>Punto Limpio</label>
-        <select>
-            <option>Seleccione</option>
-            <option>Punto Limpio Santiago Centro</option>
-            <option>Punto Limpio Providencia</option>
-            <option>Punto Limpio Maipú</option>
-        </select>
+    <label>Observaciones</label>
+    <textarea id="observaciones" placeholder="Comentario opcional" rows="3"></textarea>
 
-        <label>Código QR</label>
-        <input type="text" placeholder="QR-00001">
+    <button type="submit" class="btn-login" id="btn-registrar">
+      Registrar Reciclaje
+    </button>
 
-        <label>Observaciones</label>
-        <textarea placeholder="Comentario opcional"></textarea>
+  </form>
 
-        <button class="btn-login">
-            Registrar Reciclaje
-        </button>
+  <!-- Resultado tras registrar -->
+  <div id="resultado" style="display:none;margin-top:1rem;padding:1rem;border-radius:12px;
+    background:#e8f5e9;border:1px solid #a5d6a7;text-align:center">
+    <p style="font-size:1.5rem;font-weight:700;color:#2E8B57" id="puntos-ganados"></p>
+    <p style="color:#555;font-size:0.9rem">¡Reciclaje registrado con éxito!</p>
+    <a href="dashboard.html" style="color:#2E8B57;font-weight:600;font-size:0.9rem">Ver mis puntos →</a>
+  </div>
 
-    </form>
+  <a href="dashboard.html" style="margin-top:1rem;display:block;text-align:center;color:#2E8B57;font-size:0.85rem">
+    ← Volver al inicio
+  </a>
 
 </div>
 
+<script>
+  const token   = localStorage.getItem("token")
+  const usuario = JSON.parse(localStorage.getItem("usuario") || "null")
+  if (!token || !usuario) window.location.href = "index.html"
+
+  // Cargar puntos limpios desde MongoDB
+  async function cargarPuntos() {
+    try {
+      const res  = await fetch("http://localhost:3000/api/puntos-limpios", {
+        headers: { "Authorization": "Bearer " + token }
+      })
+      const data = await res.json()
+
+      const select = document.getElementById("id_punto")
+      select.innerHTML = '<option value="">Seleccione un punto</option>'
+
+      data.forEach(p => {
+        const opt    = document.createElement("option")
+        opt.value    = p._id
+        opt.textContent = p.nombre_punto + " – " + p.direccion
+        // Al seleccionar, auto-rellenar el QR
+        opt.dataset.qr = p.codigo_qr
+        select.appendChild(opt)
+      })
+
+      // Auto-rellenar QR al elegir punto
+      select.addEventListener("change", () => {
+        const opt = select.options[select.selectedIndex]
+        document.getElementById("codigo_qr").value = opt.dataset.qr || ""
+      })
+
+    } catch {
+      document.getElementById("id_punto").innerHTML =
+        '<option value="">Error al cargar puntos</option>'
+    }
+  }
+
+  // Enviar reciclaje al backend
+  document.getElementById("form-reciclaje").addEventListener("submit", async (e) => {
+    e.preventDefault()
+
+    const btn = document.getElementById("btn-registrar")
+    btn.textContent = "Registrando..."
+    btn.disabled    = true
+
+    const body = {
+      tipo_material: document.getElementById("tipo_material").value,
+      cantidad:      parseFloat(document.getElementById("cantidad").value),
+      id_punto:      document.getElementById("id_punto").value,
+      codigo_qr:     document.getElementById("codigo_qr").value,
+      observaciones: document.getElementById("observaciones").value
+    }
+
+    try {
+      const res  = await fetch("http://localhost:3000/api/reciclaje/qr", {
+        method:  "POST",
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify(body)
+      })
+      const data = await res.json()
+
+      if (res.ok) {
+        // Mostrar puntos ganados
+        document.getElementById("form-reciclaje").style.display = "none"
+        document.getElementById("resultado").style.display      = "block"
+        document.getElementById("puntos-ganados").textContent   = "+" + data.puntos_ganados + " puntos"
+
+        // Actualizar puntos en localStorage
+        usuario.puntos_totales += data.puntos_ganados
+        localStorage.setItem("usuario", JSON.stringify(usuario))
+      } else {
+        alert("Error: " + data.mensaje)
+        btn.textContent = "Registrar Reciclaje"
+        btn.disabled    = false
+      }
+
+    } catch {
+      alert("Error de conexión con el servidor")
+      btn.textContent = "Registrar Reciclaje"
+      btn.disabled    = false
+    }
+  })
+
+  cargarPuntos()
+</script>
 </body>
 </html>
