@@ -4,14 +4,7 @@ const cors      = require("cors");
 const bcrypt    = require("bcryptjs");
 const jwt       = require("jsonwebtoken");
 const path      = require("path");
-const express  = require("express");
-const mongoose = require("mongoose");
-const cors     = require("cors");
-const bcrypt   = require("bcryptjs");
-const jwt      = require("jsonwebtoken");
-const path     = require("path");
 const axios    = require("axios");
-
 require("dotenv").config();
 
 const app = express();
@@ -81,14 +74,6 @@ function verificarJWT(req, res, next) {
     res.status(401).json({ mensaje: "Token invalido o expirado" });
   }
 }
-
-const Canje = mongoose.model("Canje", new mongoose.Schema({
-  id_usuario:        { type: mongoose.Schema.Types.ObjectId, ref: "Usuario" },
-  id_beneficio:      { type: mongoose.Schema.Types.ObjectId, ref: "Beneficio" },
-  puntos_utilizados: Number,
-  fecha_canje:       { type: Date, default: Date.now },
-  estado_canje:      { type: String, default: "pendiente" }
-}));
 
 // ── Middleware JWT ─────────────────────────────────────────
 function verificarJWT(req, res, next) {
