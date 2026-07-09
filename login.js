@@ -5,7 +5,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     const correo = document.getElementById("correo").value;
     const password = document.getElementById("password").value;
 
-    const respuesta = await fetch("https://civiloopchile.onreder.com/login", {
+    const respuesta = await fetch("https://civiloopchile.onrender.com/login", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
