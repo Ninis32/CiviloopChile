@@ -136,7 +136,7 @@ app.post("/recuperar-password", async (req, res) => {
       return res.json({ mensaje: "Si el correo existe, recibiras un enlace." });
 
     const token  = jwt.sign({ id: usuario._id }, process.env.JWT_SECRET, { expiresIn: "15m" });
-    const enlace = `http://localhost:3000/restablecer.html?token=${token}`;
+    const enlace = `https://civiloopchile.onrender.com/restablecer.html?token=${token}`;
 
     await axios.post("https://api.brevo.com/v3/smtp/email",
       {
@@ -271,7 +271,7 @@ app.get("/", (req, res) => {
 
 app.listen(process.env.PORT || 3000, () => {
   console.log("Servidor en puerto", process.env.PORT || 3000);
-  console.log("Abre: http://localhost:3000");
+  console.log("Abre: https://civiloopchile.onrender.com");
 });
 
 // GET /api/admin/usuarios — listar todos los usuarios

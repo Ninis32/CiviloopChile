@@ -11,7 +11,7 @@ document.getElementById("registroForm").addEventListener("submit", async (e) => 
   const region   = document.getElementById("region").value;
 
   try {
-    const res   = await fetch("http://localhost:3000/registro", {
+    const res   = await fetch("https://civiloopchile.onrender.com/registro", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ nombre, correo, password, region })

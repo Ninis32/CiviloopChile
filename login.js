@@ -1,5 +1,5 @@
 const API = window.location.port === "5500" || window.location.port === "5501"
-  ? "http://localhost:3000"
+  ? "https://civiloopchile.onrender.com"
   : "";
 
 document.querySelector("form").addEventListener("submit", async (e) => {

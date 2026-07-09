@@ -43,7 +43,7 @@
   // Cargar beneficios desde MongoDB
   async function cargarBeneficios() {
     try {
-      const res  = await fetch("http://localhost:3000/api/beneficios", {
+      const res  = await fetch("https://civiloopchile.onrender.com/api/beneficios", {
         headers: { "Authorization": "Bearer " + token }
       })
       const data = await res.json()
@@ -86,7 +86,7 @@
     if (!confirm(`¿Canjear por ${puntos} puntos?`)) return
 
     try {
-      const res  = await fetch("http://localhost:3000/api/canjes", {
+      const res  = await fetch("https://civiloopchile.onrender.com/api/canjes", {
         method:  "POST",
         headers: {
           "Content-Type":  "application/json",

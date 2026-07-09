@@ -566,7 +566,7 @@
 <script>
 const token   = localStorage.getItem("token")
 const usuario = JSON.parse(localStorage.getItem("usuario") || "null")
-const API     = window.location.port === "5500" ? "http://localhost:3000" : ""
+const API     = window.location.port === "5500" ? "https://civiloopchile.onrender.com" : ""
 
 if (!token || !usuario) window.location.href = "index.html"
 if (usuario.rol === "ciudadano") window.location.href = "dashboard.html"

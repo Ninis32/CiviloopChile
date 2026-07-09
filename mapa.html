@@ -106,7 +106,7 @@
   // Cargar puntos desde MongoDB
   async function cargarPuntos() {
     try {
-      const res  = await fetch("http://localhost:3000/api/puntos-limpios", {
+      const res  = await fetch("https://civiloopchile.onrender.com/api/puntos-limpios", {
         headers: { "Authorization": "Bearer " + token }
       })
       puntos = await res.json()
