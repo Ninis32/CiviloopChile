@@ -242,7 +242,7 @@ app.post("/api/reciclaje/qr", verificarJWT, async (req, res) => {
     res.json({ mensaje: "Reciclaje registrado", puntos_ganados });
   } catch (err) {
     console.log(err);
-    res.status(500).json({ mensaje: "Error al registrar reciclaje" });
+    res.status(500).json({ mensaje: "Error al registrar_reciclaje" });
   }
 });
 

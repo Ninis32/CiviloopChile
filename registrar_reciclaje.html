@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registrar Reciclaje – CiviLoop Chile</title>
+  <title>Registrar_Reciclaje – CiviLoop Chile</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -41,7 +41,7 @@
     <textarea id="observaciones" placeholder="Comentario opcional" rows="3"></textarea>
 
     <button type="submit" class="btn-login" id="btn-registrar">
-      Registrar Reciclaje
+      Registrar_Reciclaje
     </button>
 
   </form>
@@ -135,13 +135,13 @@
         localStorage.setItem("usuario", JSON.stringify(usuario))
       } else {
         alert("Error: " + data.mensaje)
-        btn.textContent = "Registrar Reciclaje"
+        btn.textContent = "Registrar_Reciclaje"
         btn.disabled    = false
       }
 
     } catch {
       alert("Error de conexión con el servidor")
-      btn.textContent = "Registrar Reciclaje"
+      btn.textContent = "Registrar_Reciclaje"
       btn.disabled    = false
     }
   })
