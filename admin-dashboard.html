@@ -181,13 +181,33 @@
     /* ── Configuración ── */
     .config-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
     @media(max-width:700px){
-      .sidebar{ width:60px; }
-      .sidebar-logo h2, .sidebar-logo span, .nav-item span,
-      .sidebar-admin .info, .nav-separador, .sidebar-bottom .btn-cerrar span,
-      .sidebar-admin .nombre, .sidebar-admin .rol{ display:none; }
-      .main{ margin-left:60px; }
+      .sidebar{
+        width:100%; height:auto; position:relative;
+        flex-direction:row; flex-wrap:wrap; min-height:auto;
+      }
+      .sidebar-logo{ padding:0.5rem 1rem; flex:1; text-align:left; border-bottom:none; border-right:1px solid rgba(255,255,255,0.15); }
+      .sidebar-logo .emoji{ display:inline; font-size:1.2rem; margin:0 6px 0 0; }
+      .sidebar-logo h2{ display:inline; font-size:0.9rem; }
+      .sidebar-logo span{ display:none; }
+      .sidebar-admin{ display:none; }
+      .nav{
+        display:flex; flex-direction:row; flex-wrap:wrap;
+        padding:0; width:100%; border-top:1px solid rgba(255,255,255,0.1);
+      }
+      .nav-separador{ display:none; }
+      .nav-item{
+        padding:0.5rem 0.75rem; font-size:0.75rem;
+        border-left:none; border-bottom:3px solid transparent;
+        flex-direction:column; gap:2px; text-align:center;
+      }
+      .nav-item.active{ border-bottom-color:#a5d6a7; border-left:none; }
+      .nav-item .icon{ font-size:1rem; width:auto; }
+      .sidebar-bottom{ width:100%; padding:0.4rem 1rem; border-top:1px solid rgba(255,255,255,0.1); }
+      .btn-cerrar{ width:auto; padding:0.4rem 0.75rem; font-size:0.78rem; }
+      .main{ margin-left:0; }
       .stats-grid{ grid-template-columns:1fr 1fr; }
       .config-grid{ grid-template-columns:1fr; }
+      body{ flex-direction:column; }
     }
 
     /* ── Toast ── */
