@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Admin – CiviLoop Chile</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    body{ font-family:'Segoe UI',sans-serif; background:#f1f8e9; display:flex; min-height:100vh; }
+
+    /* ── Sidebar ── */
+    .sidebar{
+      width:240px; background:#1A5C35; color:white;
+      display:flex; flex-direction:column; min-height:100vh;
+      position:fixed; top:0; left:0; z-index:100;
+    }
+    .sidebar-logo{
+      padding:1.5rem 1rem; border-bottom:1px solid rgba(255,255,255,0.15);
+      text-align:center;
+    }
+    .sidebar-logo h2{ font-size:1.1rem; color:white; }
+    .sidebar-logo span{ color:#a5d6a7; font-size:0.8rem; }
+    .sidebar-logo .emoji{ font-size:2rem; display:block; margin-bottom:4px; }
+
+    .sidebar-admin{
+      padding:0.75rem 1rem; border-bottom:1px solid rgba(255,255,255,0.1);
+      display:flex; align-items:center; gap:8px;
+    }
+    .sidebar-admin .avatar{
+      width:36px; height:36px; border-radius:50%;
+      background:#2E8B57; display:flex; align-items:center;
+      justify-content:center; font-weight:700; font-size:1rem;
+    }
+    .sidebar-admin .info{ flex:1; }
+    .sidebar-admin .nombre{ font-size:0.85rem; font-weight:600; }
+    .sidebar-admin .rol{ font-size:0.72rem; color:#a5d6a7; }
+
+    .nav{ flex:1; padding:0.5rem 0; }
+    .nav-item{
+      display:flex; align-items:center; gap:10px;
+      padding:0.7rem 1.2rem; cursor:pointer;
+      color:rgba(255,255,255,0.8); font-size:0.88rem;
+      transition:all .15s; border-left:3px solid transparent;
+    }
+    .nav-item:hover{ background:rgba(255,255,255,0.08); color:white; }
+    .nav-item.active{
+      background:rgba(255,255,255,0.12); color:white;
+      border-left-color:#a5d6a7;
+    }
+    .nav-item .icon{ font-size:1.1rem; width:22px; text-align:center; }
+    .nav-separador{
+      font-size:0.68rem; color:rgba(255,255,255,0.4);
+      padding:0.75rem 1.2rem 0.25rem; text-transform:uppercase; letter-spacing:1px;
+    }
+
+    .sidebar-bottom{ padding:1rem; border-top:1px solid rgba(255,255,255,0.1); }
+    .btn-cerrar{
+      width:100%; padding:0.6rem; background:rgba(255,255,255,0.1);
+      color:white; border:1px solid rgba(255,255,255,0.2);
+      border-radius:8px; cursor:pointer; font-size:0.85rem;
+      transition:all .15s;
+    }
+    .btn-cerrar:hover{ background:rgba(255,255,255,0.2); }
+
+    /* ── Main ── */
+    .main{ margin-left:240px; flex:1; display:flex; flex-direction:column; }
+    .topbar{
+      background:white; padding:1rem 1.5rem;
+      border-bottom:1px solid #e0e0e0;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .topbar h1{ font-size:1.1rem; color:#1A5C35; font-weight:600; }
+    .topbar-fecha{ font-size:0.82rem; color:#888; }
+
+    .content{ padding:1.5rem; flex:1; }
+
+    /* ── Secciones ── */
+    .seccion{ display:none; }
+    .seccion.active{ display:block; }
+
+    /* ── Cards estadísticas ── */
+    .stats-grid{
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+      gap:1rem; margin-bottom:1.5rem;
+    }
+    .stat-card{
+      background:white; border-radius:12px; padding:1.2rem;
+      border-left:4px solid #2E8B57; box-shadow:0 1px 4px rgba(0,0,0,0.06);
+    }
+    .stat-card.azul{ border-left-color:#1565C0; }
+    .stat-card.naranja{ border-left-color:#E65100; }
+    .stat-card.morado{ border-left-color:#6A1B9A; }
+    .stat-num{ font-size:2rem; font-weight:700; color:#1A5C35; }
+    .stat-card.azul .stat-num{ color:#1565C0; }
+    .stat-card.naranja .stat-num{ color:#E65100; }
+    .stat-card.morado .stat-num{ color:#6A1B9A; }
+    .stat-label{ font-size:0.8rem; color:#888; margin-top:2px; }
+    .stat-icon{ font-size:1.5rem; float:right; opacity:0.4; }
+
+    /* ── Tablas ── */
+    .card{
+      background:white; border-radius:12px; padding:1.25rem;
+      box-shadow:0 1px 4px rgba(0,0,0,0.06); margin-bottom:1rem;
+    }
+    .card-header{
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:1rem;
+    }
+    .card-header h3{ font-size:1rem; color:#1A5C35; }
+    .btn-add{
+      padding:0.4rem 0.9rem; background:#2E8B57; color:white;
+      border:none; border-radius:8px; cursor:pointer; font-size:0.82rem;
+    }
+    .btn-add:hover{ background:#1A5C35; }
+
+    table{ width:100%; border-collapse:collapse; font-size:0.85rem; }
+    th{
+      text-align:left; padding:0.6rem 0.75rem;
+      background:#f9fff9; color:#1A5C35; font-weight:600;
+      border-bottom:2px solid #e8f5e9;
+    }
+    td{ padding:0.6rem 0.75rem; border-bottom:1px solid #f0f0f0; color:#333; }
+    tr:hover td{ background:#fafff8; }
+
+    .badge{
+      display:inline-block; padding:2px 8px; border-radius:20px;
+      font-size:0.72rem; font-weight:600;
+    }
+    .badge-verde{ background:#e8f5e9; color:#2E8B57; }
+    .badge-rojo{  background:#fce4ec; color:#c62828; }
+    .badge-gris{  background:#f5f5f5; color:#666; }
+    .badge-azul{  background:#e3f2fd; color:#1565C0; }
+
+    .btn-accion{
+      padding:3px 10px; border-radius:6px; border:none;
+      cursor:pointer; font-size:0.75rem; margin-right:4px;
+    }
+    .btn-activar{  background:#e8f5e9; color:#2E8B57; }
+    .btn-bloquear{ background:#fce4ec; color:#c62828; }
+    .btn-editar{   background:#e3f2fd; color:#1565C0; }
+    .btn-eliminar{ background:#fce4ec; color:#c62828; }
+
+    /* ── Formulario modal ── */
+    .modal-overlay{
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.5); z-index:999;
+      align-items:center; justify-content:center;
+    }
+    .modal-overlay.show{ display:flex; }
+    .modal{
+      background:white; border-radius:16px; padding:1.5rem;
+      width:90%; max-width:480px; max-height:90vh; overflow-y:auto;
+    }
+    .modal h3{ color:#1A5C35; margin-bottom:1rem; }
+    .modal label{ display:block; font-size:0.82rem; color:#555; margin-bottom:4px; margin-top:12px; }
+    .modal input, .modal select, .modal textarea{
+      width:100%; padding:0.6rem 0.75rem; border:1px solid #ddd;
+      border-radius:8px; font-size:0.88rem; font-family:inherit;
+    }
+    .modal-btns{ display:flex; gap:8px; margin-top:1rem; justify-content:flex-end; }
+    .btn-cancelar{
+      padding:0.5rem 1rem; background:#f5f5f5; color:#666;
+      border:none; border-radius:8px; cursor:pointer;
+    }
+    .btn-guardar{
+      padding:0.5rem 1rem; background:#2E8B57; color:white;
+      border:none; border-radius:8px; cursor:pointer;
+    }
+
+    /* ── Gráfico simple ── */
+    .bar-chart{ display:flex; gap:8px; align-items:flex-end; height:120px; margin:1rem 0; }
+    .bar-wrap{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .bar{
+      width:100%; background:#2E8B57; border-radius:6px 6px 0 0;
+      transition:height .3s;
+    }
+    .bar-label{ font-size:0.68rem; color:#888; text-align:center; }
+    .bar-val{ font-size:0.72rem; color:#2E8B57; font-weight:600; }
+
+    /* ── Configuración ── */
+    .config-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    @media(max-width:700px){
+      .sidebar{ width:60px; }
+      .sidebar-logo h2, .sidebar-logo span, .nav-item span,
+      .sidebar-admin .info, .nav-separador, .sidebar-bottom .btn-cerrar span,
+      .sidebar-admin .nombre, .sidebar-admin .rol{ display:none; }
+      .main{ margin-left:60px; }
+      .stats-grid{ grid-template-columns:1fr 1fr; }
+      .config-grid{ grid-template-columns:1fr; }
+    }
+
+    /* ── Toast ── */
+    #toast{
+      position:fixed; bottom:1.5rem; right:1.5rem;
+      background:#1A5C35; color:white; padding:0.6rem 1.2rem;
+      border-radius:20px; font-size:0.85rem; display:none; z-index:9999;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <span class="emoji">♻️</span>
+    <h2>CiviLoop Chile</h2>
+    <span>Panel de Administración</span>
+  </div>
+
+  <div class="sidebar-admin">
+    <div class="avatar" id="avatar-letra">A</div>
+    <div class="info">
+      <div class="nombre" id="admin-nombre">Admin</div>
+      <div class="rol">Administrador</div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-separador">Principal</div>
+    <div class="nav-item active" onclick="mostrar('inicio')">
+      <span class="icon">🏠</span><span>Inicio</span>
+    </div>
+    <div class="nav-item" onclick="mostrar('estadisticas')">
+      <span class="icon">📊</span><span>Estadísticas</span>
+    </div>
+
+    <div class="nav-separador">Gestión</div>
+    <div class="nav-item" onclick="mostrar('usuarios')">
+      <span class="icon">👥</span><span>Usuarios</span>
+    </div>
+    <div class="nav-item" onclick="mostrar('puntos')">
+      <span class="icon">📍</span><span>Puntos Limpios</span>
+    </div>
+    <div class="nav-item" onclick="mostrar('recompensas')">
+      <span class="icon">🎁</span><span>Recompensas</span>
+    </div>
+    <div class="nav-item" onclick="mostrar('retos')">
+      <span class="icon">🏆</span><span>Retos</span>
+    </div>
+
+    <div class="nav-separador">Reportes</div>
+    <div class="nav-item" onclick="mostrar('reportes')">
+      <span class="icon">📋</span><span>Reportes</span>
+    </div>
+
+    <div class="nav-separador">Sistema</div>
+    <div class="nav-item" onclick="mostrar('configuracion')">
+      <span class="icon">⚙️</span><span>Configuración</span>
+    </div>
+  </nav>
+
+  <div class="sidebar-bottom">
+    <button class="btn-cerrar" onclick="cerrarSesion()">
+      🚪 <span>Cerrar sesión</span>
+    </button>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<main class="main">
+  <div class="topbar">
+    <h1 id="topbar-titulo">🏠 Inicio</h1>
+    <span class="topbar-fecha" id="topbar-fecha"></span>
+  </div>
+
+  <div class="content">
+
+    <!-- ── INICIO ── -->
+    <div class="seccion active" id="sec-inicio">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-icon">👥</span>
+          <div class="stat-num" id="stat-usuarios">—</div>
+          <div class="stat-label">Usuarios registrados</div>
+        </div>
+        <div class="stat-card azul">
+          <span class="stat-icon">♻️</span>
+          <div class="stat-num" id="stat-reciclajes">—</div>
+          <div class="stat-label">Reciclajes totales</div>
+        </div>
+        <div class="stat-card naranja">
+          <span class="stat-icon">🎁</span>
+          <div class="stat-num" id="stat-canjes">—</div>
+          <div class="stat-label">Canjes realizados</div>
+        </div>
+        <div class="stat-card morado">
+          <span class="stat-icon">📍</span>
+          <div class="stat-num" id="stat-puntos">—</div>
+          <div class="stat-label">Puntos limpios activos</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Últimos usuarios registrados</h3>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Nombre</th><th>Correo</th><th>Región</th><th>Puntos</th><th>Estado</th></tr>
+          </thead>
+          <tbody id="tabla-ultimos-usuarios">
+            <tr><td colspan="5" style="text-align:center;color:#aaa">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── ESTADÍSTICAS ── -->
+    <div class="seccion" id="sec-estadisticas">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-icon">🏅</span>
+          <div class="stat-num" id="stat-puntos-total">—</div>
+          <div class="stat-label">Puntos entregados en total</div>
+        </div>
+        <div class="stat-card azul">
+          <span class="stat-icon">🌱</span>
+          <div class="stat-num" id="stat-kg">—</div>
+          <div class="stat-label">Kg reciclados estimados</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>📊 Reciclaje por material</h3></div>
+        <div class="bar-chart" id="grafico-materiales">
+          <p style="color:#aaa;font-size:0.85rem">Cargando...</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>🏆 Top 5 usuarios con más puntos</h3></div>
+        <table>
+          <thead>
+            <tr><th>#</th><th>Nombre</th><th>Correo</th><th>Puntos</th></tr>
+          </thead>
+          <tbody id="tabla-top-usuarios">
+            <tr><td colspan="4" style="text-align:center;color:#aaa">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── USUARIOS ── -->
+    <div class="seccion" id="sec-usuarios">
+      <div class="card">
+        <div class="card-header">
+          <h3>👥 Gestión de Usuarios</h3>
+          <input type="text" id="buscar-usuario" placeholder="🔍 Buscar usuario..."
+            oninput="filtrarUsuarios()"
+            style="padding:0.4rem 0.75rem;border:1px solid #ddd;border-radius:8px;font-size:0.85rem;width:200px">
+        </div>
+        <table>
+          <thead>
+            <tr><th>Nombre</th><th>Correo</th><th>Región</th><th>Rol</th><th>Puntos</th><th>Estado</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="tabla-usuarios">
+            <tr><td colspan="7" style="text-align:center;color:#aaa">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── PUNTOS LIMPIOS ── -->
+    <div class="seccion" id="sec-puntos">
+      <div class="card">
+        <div class="card-header">
+          <h3>📍 Puntos Limpios</h3>
+          <button class="btn-add" onclick="abrirModalPunto()">+ Agregar punto</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Nombre</th><th>Dirección</th><th>Materiales</th><th>QR</th><th>Estado</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="tabla-puntos">
+            <tr><td colspan="6" style="text-align:center;color:#aaa">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── RECOMPENSAS ── -->
+    <div class="seccion" id="sec-recompensas">
+      <div class="card">
+        <div class="card-header">
+          <h3>🎁 Gestión de Recompensas</h3>
+          <button class="btn-add" onclick="abrirModalRecompensa()">+ Agregar recompensa</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Título</th><th>Descripción</th><th>Puntos</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="tabla-recompensas">
+            <tr><td colspan="6" style="text-align:center;color:#aaa">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── RETOS ── -->
+    <div class="seccion" id="sec-retos">
+      <div class="card">
+        <div class="card-header">
+          <span class="icono">🏆</span>
+          <h3>Gestión de Retos</h3>
+          <button class="btn-add" onclick="abrirModalReto()">+ Agregar reto</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Reto</th><th>Descripción</th><th>Meta</th><th>Puntos premio</th><th>Estado</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="tabla-retos">
+            <tr><td colspan="6" style="text-align:center;color:#aaa">
+              <p style="padding:1rem">Los retos son desafíos de reciclaje.<br>
+              Ejemplo: "Recicla 10kg este mes y gana 200 puntos extra"</p>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── REPORTES ── -->
+    <div class="seccion" id="sec-reportes">
+      <div class="card">
+        <div class="card-header"><h3>📋 Reporte de Reciclaje</h3></div>
+        <table>
+          <thead>
+            <tr><th>Usuario</th><th>Material</th><th>Cantidad (Kg)</th><th>Puntos</th><th>Punto Limpio</th><th>Fecha</th></tr>
+          </thead>
+          <tbody id="tabla-reportes">
+            <tr><td colspan="6" style="text-align:center;color:#aaa">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>🎁 Reporte de Canjes</h3></div>
+        <table>
+          <thead>
+            <tr><th>Usuario</th><th>Beneficio</th><th>Puntos usados</th><th>Estado</th><th>Fecha</th></tr>
+          </thead>
+          <tbody id="tabla-reportes-canjes">
+            <tr><td colspan="5" style="text-align:center;color:#aaa">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── CONFIGURACIÓN ── -->
+    <div class="seccion" id="sec-configuracion">
+      <div class="card">
+        <h3 style="color:#1A5C35;margin-bottom:1rem">⚙️ Configuración del Sistema</h3>
+        <div class="config-grid">
+          <div>
+            <label style="font-size:0.82rem;color:#555">Nombre del sistema</label>
+            <input type="text" value="CiviLoop Chile"
+              style="width:100%;padding:0.6rem;border:1px solid #ddd;border-radius:8px;margin-top:4px">
+          </div>
+          <div>
+            <label style="font-size:0.82rem;color:#555">Puntos por Kg reciclado</label>
+            <input type="number" value="5"
+              style="width:100%;padding:0.6rem;border:1px solid #ddd;border-radius:8px;margin-top:4px">
+          </div>
+          <div>
+            <label style="font-size:0.82rem;color:#555">Puntos mínimos por reciclaje</label>
+            <input type="number" value="5"
+              style="width:100%;padding:0.6rem;border:1px solid #ddd;border-radius:8px;margin-top:4px">
+          </div>
+          <div>
+            <label style="font-size:0.82rem;color:#555">Email de contacto</label>
+            <input type="email" value="contacto@civiloopchile.cl"
+              style="width:100%;padding:0.6rem;border:1px solid #ddd;border-radius:8px;margin-top:4px">
+          </div>
+        </div>
+        <button class="btn-add" style="margin-top:1rem" onclick="toast('✓ Configuración guardada')">
+          Guardar configuración
+        </button>
+      </div>
+
+      <div class="card">
+        <h3 style="color:#1A5C35;margin-bottom:1rem">👤 Mi perfil de administrador</h3>
+        <div class="config-grid">
+          <div>
+            <label style="font-size:0.82rem;color:#555">Nombre</label>
+            <input type="text" id="cfg-nombre"
+              style="width:100%;padding:0.6rem;border:1px solid #ddd;border-radius:8px;margin-top:4px">
+          </div>
+          <div>
+            <label style="font-size:0.82rem;color:#555">Correo</label>
+            <input type="email" id="cfg-correo"
+              style="width:100%;padding:0.6rem;border:1px solid #ddd;border-radius:8px;margin-top:4px">
+          </div>
+        </div>
+        <button class="btn-add" style="margin-top:1rem" onclick="toast('✓ Perfil actualizado')">
+          Actualizar perfil
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+<!-- ── MODAL PUNTO LIMPIO ── -->
+<div class="modal-overlay" id="modal-punto">
+  <div class="modal">
+    <h3>📍 Nuevo Punto Limpio</h3>
+    <label>Nombre del punto</label>
+    <input type="text" id="mp-nombre" placeholder="Ej: Punto Limpio Centro">
+    <label>Dirección</label>
+    <input type="text" id="mp-dir" placeholder="Av. Ejemplo 123, Santiago">
+    <label>Latitud</label>
+    <input type="number" id="mp-lat" placeholder="-33.4489" step="0.0001">
+    <label>Longitud</label>
+    <input type="number" id="mp-lng" placeholder="-70.6693" step="0.0001">
+    <label>Código QR</label>
+    <input type="text" id="mp-qr" placeholder="QR-00008">
+    <label>Materiales (separados por coma)</label>
+    <input type="text" id="mp-mat" placeholder="Plástico, Vidrio, Papel">
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="cerrarModal('modal-punto')">Cancelar</button>
+      <button class="btn-guardar" onclick="guardarPunto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL RECOMPENSA ── -->
+<div class="modal-overlay" id="modal-recompensa">
+  <div class="modal">
+    <h3>🎁 Nueva Recompensa</h3>
+    <label>Título</label>
+    <input type="text" id="mr-titulo" placeholder="Ej: Descuento 20% en Unimarc">
+    <label>Descripción</label>
+    <textarea id="mr-desc" rows="2" placeholder="Descripción del beneficio"></textarea>
+    <label>Puntos requeridos</label>
+    <input type="number" id="mr-puntos" placeholder="100">
+    <label>Stock disponible</label>
+    <input type="number" id="mr-stock" placeholder="50">
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="cerrarModal('modal-recompensa')">Cancelar</button>
+      <button class="btn-guardar" onclick="guardarRecompensa()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL RETO ── -->
+<div class="modal-overlay" id="modal-reto">
+  <div class="modal">
+    <h3>🏆 Nuevo Reto</h3>
+    <label>Nombre del reto</label>
+    <input type="text" id="reto-nombre" placeholder="Ej: Rey del Reciclaje">
+    <label>Descripción</label>
+    <textarea id="reto-desc" rows="2" placeholder="Ej: Recicla 10kg este mes"></textarea>
+    <label>Meta (Kg a reciclar)</label>
+    <input type="number" id="reto-meta" placeholder="10">
+    <label>Puntos de premio</label>
+    <input type="number" id="reto-pts" placeholder="200">
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="cerrarModal('modal-reto')">Cancelar</button>
+      <button class="btn-guardar" onclick="guardarReto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const token   = localStorage.getItem("token")
+const usuario = JSON.parse(localStorage.getItem("usuario") || "null")
+const API     = window.location.port === "5500" ? "http://localhost:3000" : ""
+
+if (!token || !usuario) window.location.href = "index.html"
+if (usuario.rol === "ciudadano") window.location.href = "dashboard.html"
+
+// Mostrar nombre admin
+document.getElementById("admin-nombre").textContent = usuario.nombre
+document.getElementById("avatar-letra").textContent = usuario.nombre?.charAt(0).toUpperCase()
+document.getElementById("cfg-nombre").value = usuario.nombre
+document.getElementById("cfg-correo").value = usuario.correo
+
+// Fecha actual
+const ahora = new Date()
+document.getElementById("topbar-fecha").textContent =
+  ahora.toLocaleDateString("es-CL", { weekday:"long", year:"numeric", month:"long", day:"numeric" })
+
+// ── Navegación ────────────────────────────────────────────
+const titulos = {
+  inicio:"🏠 Inicio", estadisticas:"📊 Estadísticas",
+  usuarios:"👥 Usuarios", puntos:"📍 Puntos Limpios",
+  recompensas:"🎁 Recompensas", retos:"🏆 Retos",
+  reportes:"📋 Reportes", configuracion:"⚙️ Configuración"
+}
+
+function mostrar(id) {
+  document.querySelectorAll(".seccion").forEach(s => s.classList.remove("active"))
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"))
+  document.getElementById("sec-" + id).classList.add("active")
+  event.currentTarget.classList.add("active")
+  document.getElementById("topbar-titulo").textContent = titulos[id]
+
+  // Cargar datos según sección
+  if (id === "inicio")       cargarInicio()
+  if (id === "estadisticas") cargarEstadisticas()
+  if (id === "usuarios")     cargarUsuarios()
+  if (id === "puntos")       cargarPuntosAdmin()
+  if (id === "recompensas")  cargarRecompensas()
+  if (id === "reportes")     cargarReportes()
+}
+
+// ── HEADERS ───────────────────────────────────────────────
+const headers = {
+  "Content-Type": "application/json",
+  "Authorization": "Bearer " + token
+}
+
+// ── INICIO ────────────────────────────────────────────────
+async function cargarInicio() {
+  try {
+    const [rUsuarios, rPuntos] = await Promise.all([
+      fetch(API + "/api/admin/usuarios", { headers }),
+      fetch(API + "/api/puntos-limpios", { headers }),
+    ])
+    const usuarios = await rUsuarios.json()
+    const puntos   = await rPuntos.json()
+
+    document.getElementById("stat-usuarios").textContent = Array.isArray(usuarios) ? usuarios.length : "—"
+    document.getElementById("stat-puntos").textContent   = Array.isArray(puntos)   ? puntos.length   : "—"
+    document.getElementById("stat-reciclajes").textContent = "—"
+    document.getElementById("stat-canjes").textContent     = "—"
+
+    if (Array.isArray(usuarios)) {
+      const tbody = document.getElementById("tabla-ultimos-usuarios")
+      tbody.innerHTML = usuarios.slice(0,5).map(u => `
+        <tr>
+          <td>${u.nombre}</td>
+          <td>${u.correo}</td>
+          <td>${u.region}</td>
+          <td><strong style="color:#2E8B57">${u.puntos_totales}</strong></td>
+          <td><span class="badge ${u.activo ? 'badge-verde':'badge-rojo'}">${u.activo ? 'Activo':'Bloqueado'}</span></td>
+        </tr>
+      `).join("")
+    }
+  } catch { }
+}
+
+// ── ESTADÍSTICAS ──────────────────────────────────────────
+async function cargarEstadisticas() {
+  try {
+    const res = await fetch(API + "/api/admin/usuarios", { headers })
+    const usuarios = await res.json()
+    if (!Array.isArray(usuarios)) return
+
+    const totalPuntos = usuarios.reduce((s,u) => s + (u.puntos_totales||0), 0)
+    document.getElementById("stat-puntos-total").textContent = totalPuntos
+    document.getElementById("stat-kg").textContent = Math.round(totalPuntos / 5)
+
+    // Top usuarios
+    const top = [...usuarios].sort((a,b) => b.puntos_totales - a.puntos_totales).slice(0,5)
+    document.getElementById("tabla-top-usuarios").innerHTML = top.map((u,i) => `
+      <tr>
+        <td>${["🥇","🥈","🥉","4°","5°"][i]}</td>
+        <td>${u.nombre}</td>
+        <td>${u.correo}</td>
+        <td><strong style="color:#2E8B57">${u.puntos_totales}</strong></td>
+      </tr>
+    `).join("")
+
+    // Gráfico materiales (simulado)
+    const materiales = [
+      { label:"Plástico", val:42 },
+      { label:"Vidrio",   val:28 },
+      { label:"Papel",    val:18 },
+      { label:"Metal",    val:8  },
+      { label:"Cartón",   val:4  },
+    ]
+    const max = Math.max(...materiales.map(m=>m.val))
+    document.getElementById("grafico-materiales").innerHTML =
+      materiales.map(m=>`
+        <div class="bar-wrap">
+          <div class="bar-val">${m.val}%</div>
+          <div class="bar" style="height:${(m.val/max)*100}px"></div>
+          <div class="bar-label">${m.label}</div>
+        </div>
+      `).join("")
+  } catch {}
+}
+
+// ── USUARIOS ──────────────────────────────────────────────
+let todosUsuarios = []
+
+async function cargarUsuarios() {
+  try {
+    const res = await fetch(API + "/api/admin/usuarios", { headers })
+    todosUsuarios = await res.json()
+    if (!Array.isArray(todosUsuarios)) {
+      document.getElementById("tabla-usuarios").innerHTML =
+        '<tr><td colspan="7" style="text-align:center;color:#aaa">Sin datos disponibles</td></tr>'
+      return
+    }
+    renderUsuarios(todosUsuarios)
+  } catch {
+    document.getElementById("tabla-usuarios").innerHTML =
+      '<tr><td colspan="7" style="text-align:center;color:#aaa">Error al cargar usuarios</td></tr>'
+  }
+}
+
+function renderUsuarios(lista) {
+  document.getElementById("tabla-usuarios").innerHTML = lista.map(u => `
+    <tr>
+      <td>${u.nombre}</td>
+      <td>${u.correo}</td>
+      <td>${u.region}</td>
+      <td><span class="badge ${u.rol==='ciudadano'?'badge-azul':'badge-verde'}">${u.rol}</span></td>
+      <td><strong style="color:#2E8B57">${u.puntos_totales}</strong></td>
+      <td><span class="badge ${u.activo?'badge-verde':'badge-rojo'}">${u.activo?'Activo':'Bloqueado'}</span></td>
+      <td>
+        <button class="btn-accion ${u.activo?'btn-bloquear':'btn-activar'}"
+          onclick="toggleUsuario('${u._id}', ${u.activo})">
+          ${u.activo ? 'Bloquear' : 'Activar'}
+        </button>
+      </td>
+    </tr>
+  `).join("")
+}
+
+function filtrarUsuarios() {
+  const q = document.getElementById("buscar-usuario").value.toLowerCase()
+  renderUsuarios(todosUsuarios.filter(u =>
+    u.nombre.toLowerCase().includes(q) || u.correo.toLowerCase().includes(q)
+  ))
+}
+
+async function toggleUsuario(id, activo) {
+  try {
+    await fetch(API + "/api/admin/usuarios/" + id + "/estado", {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ activo: !activo })
+    })
+    toast(activo ? "✓ Usuario bloqueado" : "✓ Usuario activado")
+    cargarUsuarios()
+  } catch { toast("✗ Error al actualizar usuario") }
+}
+
+// ── PUNTOS LIMPIOS ────────────────────────────────────────
+async function cargarPuntosAdmin() {
+  try {
+    const res = await fetch(API + "/api/puntos-limpios", { headers })
+    const data = await res.json()
+    if (!Array.isArray(data) || !data.length) {
+      document.getElementById("tabla-puntos").innerHTML =
+        '<tr><td colspan="6" style="text-align:center;color:#aaa">No hay puntos limpios registrados</td></tr>'
+      return
+    }
+    document.getElementById("tabla-puntos").innerHTML = data.map(p => `
+      <tr>
+        <td>${p.nombre_punto}</td>
+        <td>${p.direccion}</td>
+        <td>${(p.materiales||[]).join(", ")}</td>
+        <td><span class="badge badge-gris">${p.codigo_qr}</span></td>
+        <td><span class="badge ${p.activo?'badge-verde':'badge-rojo'}">${p.activo?'Activo':'Inactivo'}</span></td>
+        <td>
+          <button class="btn-accion btn-editar">Editar</button>
+          <button class="btn-accion btn-bloquear">Desactivar</button>
+        </td>
+      </tr>
+    `).join("")
+  } catch {
+    document.getElementById("tabla-puntos").innerHTML =
+      '<tr><td colspan="6" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+  }
+}
+
+// ── RECOMPENSAS ───────────────────────────────────────────
+async function cargarRecompensas() {
+  try {
+    const res = await fetch(API + "/api/beneficios", { headers })
+    const data = await res.json()
+    if (!Array.isArray(data) || !data.length) {
+      document.getElementById("tabla-recompensas").innerHTML =
+        '<tr><td colspan="6" style="text-align:center;color:#aaa">No hay recompensas registradas</td></tr>'
+      return
+    }
+    document.getElementById("tabla-recompensas").innerHTML = data.map(b => `
+      <tr>
+        <td>${b.titulo || "—"}</td>
+        <td>${b.descripcion || "—"}</td>
+        <td><strong style="color:#2E8B57">${b.puntos_requeridos} pts</strong></td>
+        <td>${b.stock}</td>
+        <td><span class="badge ${b.activo?'badge-verde':'badge-rojo'}">${b.activo?'Activo':'Inactivo'}</span></td>
+        <td>
+          <button class="btn-accion btn-editar">Editar</button>
+          <button class="btn-accion btn-eliminar">Eliminar</button>
+        </td>
+      </tr>
+    `).join("")
+  } catch {
+    document.getElementById("tabla-recompensas").innerHTML =
+      '<tr><td colspan="6" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+  }
+}
+
+// ── REPORTES ──────────────────────────────────────────────
+async function cargarReportes() {
+  document.getElementById("tabla-reportes").innerHTML =
+    '<tr><td colspan="6" style="text-align:center;color:#aaa">Conectar endpoint /api/admin/historial</td></tr>'
+  document.getElementById("tabla-reportes-canjes").innerHTML =
+    '<tr><td colspan="5" style="text-align:center;color:#aaa">Conectar endpoint /api/admin/canjes</td></tr>'
+}
+
+// ── MODALES ───────────────────────────────────────────────
+function abrirModalPunto()      { document.getElementById("modal-punto").classList.add("show") }
+function abrirModalRecompensa() { document.getElementById("modal-recompensa").classList.add("show") }
+function abrirModalReto()       { document.getElementById("modal-reto").classList.add("show") }
+function cerrarModal(id)        { document.getElementById(id).classList.remove("show") }
+
+async function guardarPunto() {
+  const body = {
+    nombre_punto: document.getElementById("mp-nombre").value,
+    direccion:    document.getElementById("mp-dir").value,
+    lat:          parseFloat(document.getElementById("mp-lat").value),
+    lng:          parseFloat(document.getElementById("mp-lng").value),
+    codigo_qr:    document.getElementById("mp-qr").value,
+    materiales:   document.getElementById("mp-mat").value.split(",").map(m=>m.trim())
+  }
+  try {
+    await fetch(API + "/api/admin/puntos-limpios", { method:"POST", headers, body: JSON.stringify(body) })
+    cerrarModal("modal-punto")
+    toast("✓ Punto limpio agregado")
+    cargarPuntosAdmin()
+  } catch { toast("✗ Error al guardar") }
+}
+
+async function guardarRecompensa() {
+  const body = {
+    titulo:            document.getElementById("mr-titulo").value,
+    descripcion:       document.getElementById("mr-desc").value,
+    puntos_requeridos: parseInt(document.getElementById("mr-puntos").value),
+    stock:             parseInt(document.getElementById("mr-stock").value),
+    activo:            true
+  }
+  try {
+    await fetch(API + "/api/admin/beneficios", { method:"POST", headers, body: JSON.stringify(body) })
+    cerrarModal("modal-recompensa")
+    toast("✓ Recompensa agregada")
+    cargarRecompensas()
+  } catch { toast("✗ Error al guardar") }
+}
+
+function guardarReto() {
+  toast("✓ Reto guardado (funcionalidad en desarrollo)")
+  cerrarModal("modal-reto")
+}
+
+// ── UTILIDADES ────────────────────────────────────────────
+function toast(msg) {
+  const t = document.getElementById("toast")
+  t.textContent  = msg
+  t.style.display = "block"
+  setTimeout(() => t.style.display = "none", 3000)
+}
+
+function cerrarSesion() {
+  localStorage.removeItem("token")
+  localStorage.removeItem("usuario")
+  window.location.href = "index.html"
+}
+
+// Cerrar modal al hacer clic fuera
+document.querySelectorAll(".modal-overlay").forEach(m => {
+  m.addEventListener("click", e => { if (e.target === m) m.classList.remove("show") })
+})
+
+// Cargar inicio al entrar
+cargarInicio()
+</script>
+</body>
+</html>

@@ -1,9 +1,3 @@
-const express   = require("express");
-const mongoose  = require("mongoose");
-const cors      = require("cors");
-const bcrypt    = require("bcryptjs");
-const jwt       = require("jsonwebtoken");
-const path      = require("path");
 const express  = require("express");
 const mongoose = require("mongoose");
 const cors     = require("cors");
@@ -11,7 +5,6 @@ const bcrypt   = require("bcryptjs");
 const jwt      = require("jsonwebtoken");
 const path     = require("path");
 const axios    = require("axios");
-
 require("dotenv").config();
 
 const app = express();
@@ -23,6 +16,7 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB conectado"))
   .catch(err => console.log("Error:", err));
 
+// ── Modelos ────────────────────────────────────────────────
 const Usuario = mongoose.model("Usuario", new mongoose.Schema({
   nombre:         { type: String, required: true },
   correo:         { type: String, required: true, unique: true },
@@ -71,6 +65,7 @@ const Canje = mongoose.model("Canje", new mongoose.Schema({
   estado_canje:      { type: String, default: "pendiente" }
 }));
 
+// ── Middleware JWT (solo una vez) ──────────────────────────
 function verificarJWT(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ mensaje: "Token requerido" });
@@ -82,26 +77,7 @@ function verificarJWT(req, res, next) {
   }
 }
 
-const Canje = mongoose.model("Canje", new mongoose.Schema({
-  id_usuario:        { type: mongoose.Schema.Types.ObjectId, ref: "Usuario" },
-  id_beneficio:      { type: mongoose.Schema.Types.ObjectId, ref: "Beneficio" },
-  puntos_utilizados: Number,
-  fecha_canje:       { type: Date, default: Date.now },
-  estado_canje:      { type: String, default: "pendiente" }
-}));
-
-// ── Middleware JWT ─────────────────────────────────────────
-function verificarJWT(req, res, next) {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ mensaje: "Token requerido" });
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    res.status(401).json({ mensaje: "Token invalido o expirado" });
-  }
-}
-
+// ── POST /registro ─────────────────────────────────────────
 app.post("/registro", async (req, res) => {
   try {
     const { nombre, correo, password, region } = req.body;
@@ -118,6 +94,7 @@ app.post("/registro", async (req, res) => {
   }
 });
 
+// ── POST /login ────────────────────────────────────────────
 app.post("/login", async (req, res) => {
   try {
     const { correo, password } = req.body;
@@ -127,7 +104,6 @@ app.post("/login", async (req, res) => {
     if (!usuario.activo)
       return res.status(403).json({ mensaje: "Cuenta bloqueada" });
     const ok = await bcrypt.compare(password, usuario.password);
-
     if (!ok)
       return res.status(401).json({ mensaje: "Correo o contrasena incorrectos" });
     const token = jwt.sign(
@@ -157,49 +133,36 @@ app.post("/recuperar-password", async (req, res) => {
   const { correo } = req.body;
   try {
     const usuario = await Usuario.findOne({ correo });
+    if (!usuario)
+      return res.json({ mensaje: "Si el correo existe, recibiras un enlace." });
 
-    // Siempre responder igual (no revelar si el correo existe)
-    if (!usuario) {
-      return res.json({ mensaje: "Si el correo existe, recibirás un enlace." });
-    }
-
-    const token  = jwt.sign(
-      { id: usuario._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "15m" }
-    );
-
+    const token  = jwt.sign({ id: usuario._id }, process.env.JWT_SECRET, { expiresIn: "15m" });
     const enlace = `http://localhost:3000/restablecer.html?token=${token}`;
 
     await axios.post("https://api.brevo.com/v3/smtp/email",
       {
         sender:      { name: "Civiloop Chile", email: process.env.EMAIL_FROM },
         to:          [{ email: correo }],
-        subject:     "Recuperar contraseña – Civiloop Chile",
+        subject:     "Recuperar contrasena - Civiloop Chile",
         htmlContent: `
-          <h2>Civiloop Chile ♻️</h2>
-          <p>Haz clic en el siguiente enlace para restablecer tu contraseña:</p>
+          <h2>Civiloop Chile</h2>
+          <p>Haz clic en el siguiente enlace para restablecer tu contrasena:</p>
           <a href="${enlace}" style="background:#2E8B57;color:white;padding:10px 20px;
             border-radius:8px;text-decoration:none;display:inline-block">
-            Restablecer contraseña
+            Restablecer contrasena
           </a>
           <p style="color:#888;font-size:0.85rem;margin-top:12px">
             Este enlace vence en 15 minutos.
           </p>
         `
       },
-      {
-        headers: {
-          "api-key":      process.env.BREVO_API_KEY,
-          "Content-Type": "application/json"
-        }
-      }
+      { headers: { "api-key": process.env.BREVO_API_KEY, "Content-Type": "application/json" } }
     );
 
-    res.json({ mensaje: "Si el correo existe, recibirás un enlace." });
+    res.json({ mensaje: "Si el correo existe, recibiras un enlace." });
 
   } catch (error) {
-    console.log(error.response?.data || error);
+    console.log("ERROR BREVO:", error.response?.data || error.message);
     res.status(500).json({ mensaje: "Error enviando correo." });
   }
 });
@@ -219,7 +182,7 @@ app.post("/restablecer-password", async (req, res) => {
   }
 });
 
-// ── GET /perfil ─
+// ── GET /perfil ────────────────────────────────────────────
 app.get("/perfil", verificarJWT, async (req, res) => {
   try {
     const usuario = await Usuario.findById(req.user.id).select("-password");
@@ -229,8 +192,7 @@ app.get("/perfil", verificarJWT, async (req, res) => {
   }
 });
 
-
-// ── GET /api/puntos-limpios -
+// ── GET /api/puntos-limpios ────────────────────────────────
 app.get("/api/puntos-limpios", verificarJWT, async (req, res) => {
   try {
     const puntos = await PuntoLimpio.find({ activo: true });
@@ -240,6 +202,7 @@ app.get("/api/puntos-limpios", verificarJWT, async (req, res) => {
   }
 });
 
+// ── GET /api/beneficios ────────────────────────────────────
 app.get("/api/beneficios", verificarJWT, async (req, res) => {
   try {
     const beneficios = await Beneficio.find({ activo: true, stock: { $gt: 0 } });
@@ -249,6 +212,7 @@ app.get("/api/beneficios", verificarJWT, async (req, res) => {
   }
 });
 
+// ── GET /api/historial ─────────────────────────────────────
 app.get("/api/historial", verificarJWT, async (req, res) => {
   try {
     const historial = await Historial
@@ -261,6 +225,7 @@ app.get("/api/historial", verificarJWT, async (req, res) => {
   }
 });
 
+// ── POST /api/reciclaje/qr ─────────────────────────────────
 app.post("/api/reciclaje/qr", verificarJWT, async (req, res) => {
   try {
     const { tipo_material, cantidad, id_punto, codigo_qr, observaciones } = req.body;
@@ -268,7 +233,8 @@ app.post("/api/reciclaje/qr", verificarJWT, async (req, res) => {
     if (!punto) return res.status(404).json({ mensaje: "QR o punto limpio invalido" });
     const puntos_ganados = Math.max(5, Math.round((cantidad || 1) * 5));
     await new Historial({
-
+      id_usuario:   req.user.id,
+      id_punto:     punto._id,
       nombre_punto: punto.nombre_punto,
       tipo_material, cantidad, puntos_ganados, observaciones
     }).save();
@@ -280,6 +246,7 @@ app.post("/api/reciclaje/qr", verificarJWT, async (req, res) => {
   }
 });
 
+// ── POST /api/canjes ───────────────────────────────────────
 app.post("/api/canjes", verificarJWT, async (req, res) => {
   try {
     const { id_beneficio } = req.body;
@@ -298,6 +265,7 @@ app.post("/api/canjes", verificarJWT, async (req, res) => {
   }
 });
 
+// ── GET / ──────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
@@ -305,4 +273,57 @@ app.get("/", (req, res) => {
 app.listen(process.env.PORT || 3000, () => {
   console.log("Servidor en puerto", process.env.PORT || 3000);
   console.log("Abre: http://localhost:3000");
+});
+
+// GET /api/admin/usuarios — listar todos los usuarios
+app.get("/api/admin/usuarios", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol === "ciudadano")
+      return res.status(403).json({ mensaje: "Sin permisos" });
+    const usuarios = await Usuario.find().select("-password").sort({ fecha_registro: -1 });
+    res.json(usuarios);
+  } catch {
+    res.status(500).json({ mensaje: "Error al obtener usuarios" });
+  }
+});
+
+// PUT /api/admin/usuarios/:id/estado — activar o bloquear usuario
+app.put("/api/admin/usuarios/:id/estado", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol === "ciudadano")
+      return res.status(403).json({ mensaje: "Sin permisos" });
+    const { activo } = req.body;
+    await Usuario.findByIdAndUpdate(req.params.id, { activo });
+    res.json({ mensaje: activo ? "Usuario activado" : "Usuario bloqueado" });
+  } catch {
+    res.status(500).json({ mensaje: "Error al actualizar usuario" });
+  }
+});
+
+// POST /api/admin/puntos-limpios — crear punto limpio
+app.post("/api/admin/puntos-limpios", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol === "ciudadano")
+      return res.status(403).json({ mensaje: "Sin permisos" });
+    const { nombre_punto, direccion, lat, lng, codigo_qr, materiales } = req.body;
+    const nuevo = new PuntoLimpio({ nombre_punto, direccion, lat, lng, codigo_qr, materiales });
+    await nuevo.save();
+    res.json({ mensaje: "Punto limpio creado", punto: nuevo });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al crear punto limpio" });
+  }
+});
+
+// POST /api/admin/beneficios — crear beneficio
+app.post("/api/admin/beneficios", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol === "ciudadano")
+      return res.status(403).json({ mensaje: "Sin permisos" });
+    const { titulo, descripcion, puntos_requeridos, stock } = req.body;
+    const nuevo = new Beneficio({ titulo, descripcion, puntos_requeridos, stock, activo: true });
+    await nuevo.save();
+    res.json({ mensaje: "Beneficio creado", beneficio: nuevo });
+  } catch {
+    res.status(500).json({ mensaje: "Error al crear beneficio" });
+  }
 });

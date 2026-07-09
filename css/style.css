@@ -363,3 +363,28 @@ nav a:hover{
     color: #d4ffd4;
     font-size: 20px;
 }
+.titulo-card{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.titulo-card .icono{
+    font-size:22px;
+    width:28px;
+    text-align:center;
+}
+
+.card-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.card-header h3{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    margin:0;
+}
