@@ -77,7 +77,21 @@ function verificarJWT(req, res, next) {
   }
 }
 
+
 // ── POST /registro ─────────────────────────────────────────
+
+// ── Middleware JWT ─────────────────────────────────────────
+function verificarJWT(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ mensaje: "Token requerido" });
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ mensaje: "Token invalido o expirado" });
+  }
+}
+
 app.post("/registro", async (req, res) => {
   try {
     const { nombre, correo, password, region } = req.body;
@@ -145,7 +159,7 @@ app.post("/recuperar-password", async (req, res) => {
         to:          [{ email: correo }],
         subject:     "Recuperar contrasena - Civiloop Chile",
         htmlContent: `
-          <h2>Civiloop Chile</h2>
+          <h2>Civiloop Chile/h2>
           <p>Haz clic en el siguiente enlace para restablecer tu contrasena:</p>
           <a href="${enlace}" style="background:#2E8B57;color:white;padding:10px 20px;
             border-radius:8px;text-decoration:none;display:inline-block">
