@@ -218,39 +218,15 @@
   margin-top: 1rem;
   padding-left: 0.5rem;
 ">
-  <nav class="nav">
-    <div class="nav-separador">Principal</div>
-    <div class="nav-item active" onclick="mostrar('inicio')">
-      <span class="icon">🏠</span><span>Inicio</span>
-    </div>
-    <div class="nav-item" onclick="mostrar('estadisticas')">
-      <span class="icon">📊</span><span>Estadísticas</span>
-    </div>
-
-    <div class="nav-separador">Gestión</div>
-    <div class="nav-item" onclick="mostrar('usuarios')">
-      <span class="icon">👥</span><span>Usuarios</span>
-    </div>
-    <div class="nav-item" onclick="mostrar('puntos')">
-      <span class="icon">📍</span><span>Puntos Limpios</span>
-    </div>
-    <div class="nav-item" onclick="mostrar('recompensas')">
-      <span class="icon">🎁</span><span>Recompensas</span>
-    </div>
-    <div class="nav-item" onclick="mostrar('retos')">
-      <span class="icon">🏆</span><span>Retos</span>
-    </div>
-
-    <div class="nav-separador">Reportes</div>
-    <div class="nav-item" onclick="mostrar('reportes')">
-      <span class="icon">📋</span><span>Reportes</span>
-    </div>
-
-    <div class="nav-separador">Sistema</div>
-    <div class="nav-item" onclick="mostrar('configuracion')">
-      <span class="icon">⚙️</span><span>Configuración</span>
-    </div>
-  </nav>
+  <a href="#" onclick="mostrar('inicio', event)" class="nav-item active" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#fff; font-size:0.9rem;">🏠 Inicio</a>
+  <a href="#" onclick="mostrar('estadisticas', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">📊 Estadísticas</a>
+  <a href="#" onclick="mostrar('usuarios', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">👥 Usuarios</a>
+  <a href="#" onclick="mostrar('puntos', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">📍 Puntos Limpios</a>
+  <a href="#" onclick="mostrar('recompensas', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">🎁 Recompensas</a>
+  <a href="#" onclick="mostrar('retos', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">🏆 Retos</a>
+  <a href="#" onclick="mostrar('reportes', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">📋 Reportes</a>
+  <a href="#" onclick="mostrar('configuracion', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">⚙️ Configuración</a>
+</nav>
 
   <div class="sidebar-bottom">
     <button class="btn-cerrar" onclick="cerrarSesion()">
