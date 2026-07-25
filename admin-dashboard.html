@@ -442,13 +442,16 @@
     <!-- ── REPORTES ── -->
     <div class="seccion" id="sec-reportes">
       <div class="card">
-        <div class="card-header"><h3>📋 Reporte de Reciclaje</h3></div>
+        <div class="card-header">
+          <h3>📋 Reporte de Reciclaje</h3>
+          <button class="btn-add" onclick="abrirModalReciclaje()">+ Registrar reciclaje</button>
+        </div>
         <table>
           <thead>
-            <tr><th>Usuario</th><th>Material</th><th>Cantidad (Kg)</th><th>Puntos</th><th>Punto Limpio</th><th>Fecha</th></tr>
+            <tr><th>Usuario</th><th>Material</th><th>Cantidad (Kg)</th><th>Puntos</th><th>Punto Limpio</th><th>Fecha</th><th>Acciones</th></tr>
           </thead>
           <tbody id="tabla-reportes">
-            <tr><td colspan="6" style="text-align:center;color:#aaa">Cargando...</td></tr>
+            <tr><td colspan="7" style="text-align:center;color:#aaa">Cargando...</td></tr>
           </tbody>
         </table>
       </div>
@@ -524,6 +527,7 @@
 <div class="modal-overlay" id="modal-punto">
   <div class="modal">
     <h3>📍 Nuevo Punto Limpio</h3>
+    <input type="hidden" id="mp-id" value="">
     <label>Nombre del punto</label>
     <input type="text" id="mp-nombre" placeholder="Ej: Punto Limpio Centro">
     <label>Dirección</label>
@@ -547,6 +551,7 @@
 <div class="modal-overlay" id="modal-recompensa">
   <div class="modal">
     <h3>🎁 Nueva Recompensa</h3>
+    <input type="hidden" id="mr-id" value="">
     <label>Título</label>
     <input type="text" id="mr-titulo" placeholder="Ej: Descuento 20% en Unimarc">
     <label>Descripción</label>
@@ -558,6 +563,28 @@
     <div class="modal-btns">
       <button class="btn-cancelar" onclick="cerrarModal('modal-recompensa')">Cancelar</button>
       <button class="btn-guardar" onclick="guardarRecompensa()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL RECICLAJE ── -->
+<div class="modal-overlay" id="modal-reciclaje">
+  <div class="modal">
+    <h3>♻️ Registrar Reciclaje</h3>
+    <input type="hidden" id="mrec-id" value="">
+    <label>Usuario</label>
+    <select id="mrec-usuario">
+      <option value="">Selecciona un usuario</option>
+    </select>
+    <label>Tipo de material</label>
+    <input type="text" id="mrec-material" placeholder="Ej: Plástico">
+    <label>Cantidad (Kg)</label>
+    <input type="number" id="mrec-cantidad" step="0.1" placeholder="2.5">
+    <label>Observaciones</label>
+    <textarea id="mrec-obs" rows="2" placeholder="Opcional"></textarea>
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="cerrarModal('modal-reciclaje')">Cancelar</button>
+      <button class="btn-guardar" onclick="guardarReciclaje()">Guardar</button>
     </div>
   </div>
 </div>
@@ -591,75 +618,493 @@ const API     = window.location.port === "5500" ? "https://civiloopchile.onrende
 if (!token || !usuario) window.location.href = "index.html"
 if (usuario.rol === "ciudadano") window.location.href = "dashboard.html"
 
-// Header común para todas las peticiones
-const headers = {
-  "Content-Type": "application/json",
-  "Authorization": "Bearer " + token
-}
+// Mostrar nombre admin
+document.getElementById("admin-nombre").textContent = usuario.nombre
+document.getElementById("avatar-letra").textContent = usuario.nombre?.charAt(0).toUpperCase()
+document.getElementById("cfg-nombre").value = usuario.nombre
+document.getElementById("cfg-correo").value = usuario.correo
 
-// Mostrar info admin
-const el = id => document.getElementById(id)
-if (el("admin-nombre"))  el("admin-nombre").textContent  = usuario.nombre
-if (el("avatar-letra"))  el("avatar-letra").textContent  = usuario.nombre?.charAt(0).toUpperCase()
-if (el("cfg-nombre"))    el("cfg-nombre").value          = usuario.nombre
-if (el("cfg-correo"))    el("cfg-correo").value          = usuario.correo
-
-// Fecha en topbar
+// Fecha actual
 const ahora = new Date()
-if (el("topbar-fecha")) {
-  el("topbar-fecha").textContent = ahora.toLocaleDateString("es-CL", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric"
-  })
-}
+document.getElementById("topbar-fecha").textContent =
+  ahora.toLocaleDateString("es-CL", { weekday:"long", year:"numeric", month:"long", day:"numeric" })
 
-// ── Navegación ──────────────────────────────
+// ── Navegación ────────────────────────────────────────────
 const titulos = {
-  inicio:        "🏠 Inicio",
-  estadisticas:  "📊 Estadísticas",
-  usuarios:      "👥 Usuarios",
-  puntos:        "📍 Puntos Limpios",
-  recompensas:   "🎁 Recompensas",
-  retos:         "🏆 Retos",
-  reportes:      "📋 Reportes",
-  configuracion: "⚙️ Configuración"
+  inicio:"🏠 Inicio", estadisticas:"📊 Estadísticas",
+  usuarios:"👥 Usuarios", puntos:"📍 Puntos Limpios",
+  recompensas:"🎁 Recompensas", retos:"🏆 Retos",
+  reportes:"📋 Reportes", configuracion:"⚙️ Configuración"
 }
 
-function mostrar(id, evento) {
+function mostrar(id) {
   document.querySelectorAll(".seccion").forEach(s => s.classList.remove("active"))
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"))
-  const sec = el("sec-" + id)
-  if (sec) sec.classList.add("active")
-  if (evento && evento.currentTarget) evento.currentTarget.classList.add("active")
-  if (el("topbar-titulo")) el("topbar-titulo").textContent = titulos[id] || id
+  document.getElementById("sec-" + id).classList.add("active")
+  event.currentTarget.classList.add("active")
+  document.getElementById("topbar-titulo").textContent = titulos[id]
 
+  // Cargar datos según sección
   if (id === "inicio")       cargarInicio()
   if (id === "estadisticas") cargarEstadisticas()
   if (id === "usuarios")     cargarUsuarios()
   if (id === "puntos")       cargarPuntosAdmin()
   if (id === "recompensas")  cargarRecompensas()
-  if (id === "retos")        renderRetos()
   if (id === "reportes")     cargarReportes()
 }
 
-// ── TOAST (solo una vez) ────────────────────
+// ── HEADERS ───────────────────────────────────────────────
+const headers = {
+  "Content-Type": "application/json",
+  "Authorization": "Bearer " + token
+}
+
+// ── INICIO ────────────────────────────────────────────────
+async function cargarInicio() {
+  try {
+    const [rUsuarios, rPuntos] = await Promise.all([
+      fetch(API + "/api/admin/usuarios", { headers }),
+      fetch(API + "/api/puntos-limpios", { headers }),
+    ])
+    const usuarios = await rUsuarios.json()
+    const puntos   = await rPuntos.json()
+
+    document.getElementById("stat-usuarios").textContent = Array.isArray(usuarios) ? usuarios.length : "—"
+    document.getElementById("stat-puntos").textContent   = Array.isArray(puntos)   ? puntos.length   : "—"
+    document.getElementById("stat-reciclajes").textContent = "—"
+    document.getElementById("stat-canjes").textContent     = "—"
+
+    if (Array.isArray(usuarios)) {
+      const tbody = document.getElementById("tabla-ultimos-usuarios")
+      tbody.innerHTML = usuarios.slice(0,5).map(u => `
+        <tr>
+          <td>${u.nombre}</td>
+          <td>${u.correo}</td>
+          <td>${u.region}</td>
+          <td><strong style="color:#2E8B57">${u.puntos_totales}</strong></td>
+          <td><span class="badge ${u.activo ? 'badge-verde':'badge-rojo'}">${u.activo ? 'Activo':'Bloqueado'}</span></td>
+        </tr>
+      `).join("")
+    }
+  } catch { }
+}
+
+// ── ESTADÍSTICAS ──────────────────────────────────────────
+async function cargarEstadisticas() {
+  try {
+    const res = await fetch(API + "/api/admin/usuarios", { headers })
+    const usuarios = await res.json()
+    if (!Array.isArray(usuarios)) return
+
+    const totalPuntos = usuarios.reduce((s,u) => s + (u.puntos_totales||0), 0)
+    document.getElementById("stat-puntos-total").textContent = totalPuntos
+    document.getElementById("stat-kg").textContent = Math.round(totalPuntos / 5)
+
+    // Top usuarios
+    const top = [...usuarios].sort((a,b) => b.puntos_totales - a.puntos_totales).slice(0,5)
+    document.getElementById("tabla-top-usuarios").innerHTML = top.map((u,i) => `
+      <tr>
+        <td>${["🥇","🥈","🥉","4°","5°"][i]}</td>
+        <td>${u.nombre}</td>
+        <td>${u.correo}</td>
+        <td><strong style="color:#2E8B57">${u.puntos_totales}</strong></td>
+      </tr>
+    `).join("")
+
+    // Gráfico materiales (simulado)
+    const materiales = [
+      { label:"Plástico", val:42 },
+      { label:"Vidrio",   val:28 },
+      { label:"Papel",    val:18 },
+      { label:"Metal",    val:8  },
+      { label:"Cartón",   val:4  },
+    ]
+    const max = Math.max(...materiales.map(m=>m.val))
+    document.getElementById("grafico-materiales").innerHTML =
+      materiales.map(m=>`
+        <div class="bar-wrap">
+          <div class="bar-val">${m.val}%</div>
+          <div class="bar" style="height:${(m.val/max)*100}px"></div>
+          <div class="bar-label">${m.label}</div>
+        </div>
+      `).join("")
+  } catch {}
+}
+
+// ── USUARIOS ──────────────────────────────────────────────
+let todosUsuarios = []
+
+async function cargarUsuarios() {
+  try {
+    const res = await fetch(API + "/api/admin/usuarios", { headers })
+    todosUsuarios = await res.json()
+    if (!Array.isArray(todosUsuarios)) {
+      document.getElementById("tabla-usuarios").innerHTML =
+        '<tr><td colspan="7" style="text-align:center;color:#aaa">Sin datos disponibles</td></tr>'
+      return
+    }
+    renderUsuarios(todosUsuarios)
+  } catch {
+    document.getElementById("tabla-usuarios").innerHTML =
+      '<tr><td colspan="7" style="text-align:center;color:#aaa">Error al cargar usuarios</td></tr>'
+  }
+}
+
+function renderUsuarios(lista) {
+  document.getElementById("tabla-usuarios").innerHTML = lista.map(u => `
+    <tr>
+      <td>${u.nombre}</td>
+      <td>${u.correo}</td>
+      <td>${u.region}</td>
+      <td><span class="badge ${u.rol==='ciudadano'?'badge-azul':'badge-verde'}">${u.rol}</span></td>
+      <td><strong style="color:#2E8B57">${u.puntos_totales}</strong></td>
+      <td><span class="badge ${u.activo?'badge-verde':'badge-rojo'}">${u.activo?'Activo':'Bloqueado'}</span></td>
+      <td>
+        <button class="btn-accion ${u.activo?'btn-bloquear':'btn-activar'}"
+          onclick="toggleUsuario('${u._id}', ${u.activo})">
+          ${u.activo ? 'Bloquear' : 'Activar'}
+        </button>
+      </td>
+    </tr>
+  `).join("")
+}
+
+function filtrarUsuarios() {
+  const q = document.getElementById("buscar-usuario").value.toLowerCase()
+  renderUsuarios(todosUsuarios.filter(u =>
+    u.nombre.toLowerCase().includes(q) || u.correo.toLowerCase().includes(q)
+  ))
+}
+
+async function toggleUsuario(id, activo) {
+  try {
+    await fetch(API + "/api/admin/usuarios/" + id + "/estado", {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ activo: !activo })
+    })
+    toast(activo ? "✓ Usuario bloqueado" : "✓ Usuario activado")
+    cargarUsuarios()
+  } catch { toast("✗ Error al actualizar usuario") }
+}
+
+// ── PUNTOS LIMPIOS ────────────────────────────────────────
+let puntosCache = []
+
+async function cargarPuntosAdmin() {
+  try {
+    const res = await fetch(API + "/api/admin/puntos-limpios", { headers })
+    const data = await res.json()
+    puntosCache = Array.isArray(data) ? data : []
+    if (!puntosCache.length) {
+      document.getElementById("tabla-puntos").innerHTML =
+        '<tr><td colspan="6" style="text-align:center;color:#aaa">No hay puntos limpios registrados</td></tr>'
+      return
+    }
+    document.getElementById("tabla-puntos").innerHTML = puntosCache.map(p => `
+      <tr>
+        <td>${p.nombre_punto}</td>
+        <td>${p.direccion}</td>
+        <td>${(p.materiales||[]).join(", ")}</td>
+        <td><span class="badge badge-gris">${p.codigo_qr}</span></td>
+        <td><span class="badge ${p.activo?'badge-verde':'badge-rojo'}">${p.activo?'Activo':'Inactivo'}</span></td>
+        <td>
+          <button class="btn-accion btn-editar" onclick="editarPunto('${p._id}')">Editar</button>
+          <button class="btn-accion btn-bloquear" onclick="togglePunto('${p._id}', ${!p.activo})">${p.activo?'Desactivar':'Activar'}</button>
+        </td>
+      </tr>
+    `).join("")
+  } catch {
+    document.getElementById("tabla-puntos").innerHTML =
+      '<tr><td colspan="6" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+  }
+}
+
+function editarPunto(id) {
+  const p = puntosCache.find(x => x._id === id)
+  if (!p) return
+  document.getElementById("mp-id").value     = p._id
+  document.getElementById("mp-nombre").value = p.nombre_punto
+  document.getElementById("mp-dir").value    = p.direccion
+  document.getElementById("mp-lat").value    = p.lat
+  document.getElementById("mp-lng").value    = p.lng
+  document.getElementById("mp-qr").value     = p.codigo_qr
+  document.getElementById("mp-mat").value    = (p.materiales||[]).join(", ")
+  document.querySelector("#modal-punto h3").textContent = "📍 Editar Punto Limpio"
+  abrirModalPunto()
+}
+
+async function togglePunto(id, nuevoEstado) {
+  try {
+    await fetch(API + "/api/admin/puntos-limpios/" + id + "/estado", {
+      method: "PUT", headers, body: JSON.stringify({ activo: nuevoEstado })
+    })
+    toast(nuevoEstado ? "✓ Punto activado" : "✓ Punto desactivado")
+    cargarPuntosAdmin()
+  } catch { toast("✗ Error al actualizar punto") }
+}
+
+// ── RECOMPENSAS ───────────────────────────────────────────
+let beneficiosCache = []
+
+async function cargarRecompensas() {
+  try {
+    const res = await fetch(API + "/api/admin/beneficios", { headers })
+    const data = await res.json()
+    beneficiosCache = Array.isArray(data) ? data : []
+    if (!beneficiosCache.length) {
+      document.getElementById("tabla-recompensas").innerHTML =
+        '<tr><td colspan="6" style="text-align:center;color:#aaa">No hay recompensas registradas</td></tr>'
+      return
+    }
+    document.getElementById("tabla-recompensas").innerHTML = beneficiosCache.map(b => `
+      <tr>
+        <td>${b.titulo || "—"}</td>
+        <td>${b.descripcion || "—"}</td>
+        <td><strong style="color:#2E8B57">${b.puntos_requeridos} pts</strong></td>
+        <td>${b.stock}</td>
+        <td><span class="badge ${b.activo?'badge-verde':'badge-rojo'}">${b.activo?'Activo':'Inactivo'}</span></td>
+        <td>
+          <button class="btn-accion btn-editar" onclick="editarRecompensa('${b._id}')">Editar</button>
+          <button class="btn-accion btn-eliminar" onclick="eliminarRecompensa('${b._id}')">Eliminar</button>
+        </td>
+      </tr>
+    `).join("")
+  } catch {
+    document.getElementById("tabla-recompensas").innerHTML =
+      '<tr><td colspan="6" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+  }
+}
+
+function editarRecompensa(id) {
+  const b = beneficiosCache.find(x => x._id === id)
+  if (!b) return
+  document.getElementById("mr-id").value     = b._id
+  document.getElementById("mr-titulo").value = b.titulo
+  document.getElementById("mr-desc").value   = b.descripcion
+  document.getElementById("mr-puntos").value = b.puntos_requeridos
+  document.getElementById("mr-stock").value  = b.stock
+  document.querySelector("#modal-recompensa h3").textContent = "🎁 Editar Recompensa"
+  abrirModalRecompensa()
+}
+
+async function eliminarRecompensa(id) {
+  if (!confirm("¿Eliminar esta recompensa? Esta acción no se puede deshacer.")) return
+  try {
+    await fetch(API + "/api/admin/beneficios/" + id, { method: "DELETE", headers })
+    toast("✓ Recompensa eliminada")
+    cargarRecompensas()
+  } catch { toast("✗ Error al eliminar") }
+}
+
+// ── REPORTES / RECICLAJE (CRUD) ────────────────────────────
+async function cargarReportes() {
+  try {
+    const res = await fetch(API + "/api/admin/historial", { headers })
+    const data = await res.json()
+    historialCache = Array.isArray(data) ? data : []
+    if (!historialCache.length) {
+      document.getElementById("tabla-reportes").innerHTML =
+        '<tr><td colspan="7" style="text-align:center;color:#aaa">No hay reciclajes registrados</td></tr>'
+    } else {
+      document.getElementById("tabla-reportes").innerHTML = historialCache.map(h => `
+        <tr>
+          <td>${h.id_usuario?.nombre || "Usuario eliminado"}</td>
+          <td>${h.tipo_material}</td>
+          <td>${h.cantidad ?? "—"}</td>
+          <td><strong style="color:#2E8B57">${h.puntos_ganados} pts</strong></td>
+          <td>${h.nombre_punto || "—"}</td>
+          <td>${new Date(h.fecha_actividad).toLocaleDateString("es-CL")}</td>
+          <td>
+            <button class="btn-accion btn-editar" onclick="editarReciclaje('${h._id}')">Editar</button>
+            <button class="btn-accion btn-eliminar" onclick="eliminarReciclaje('${h._id}')">Eliminar</button>
+          </td>
+        </tr>
+      `).join("")
+    }
+  } catch {
+    document.getElementById("tabla-reportes").innerHTML =
+      '<tr><td colspan="7" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+  }
+
+  try {
+    const res2 = await fetch(API + "/api/admin/canjes", { headers })
+    const data2 = await res2.json()
+    if (!Array.isArray(data2) || !data2.length) {
+      document.getElementById("tabla-reportes-canjes").innerHTML =
+        '<tr><td colspan="5" style="text-align:center;color:#aaa">No hay canjes registrados</td></tr>'
+    } else {
+      document.getElementById("tabla-reportes-canjes").innerHTML = data2.map(c => `
+        <tr>
+          <td>${c.id_usuario?.nombre || "Usuario eliminado"}</td>
+          <td>${c.id_beneficio?.titulo || "Beneficio eliminado"}</td>
+          <td>${c.puntos_utilizados} pts</td>
+          <td>${c.estado_canje}</td>
+          <td>${new Date(c.fecha_canje).toLocaleDateString("es-CL")}</td>
+        </tr>
+      `).join("")
+    }
+  } catch {
+    document.getElementById("tabla-reportes-canjes").innerHTML =
+      '<tr><td colspan="5" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+  }
+}
+
+let historialCache = []
+
+function editarReciclaje(id) {
+  const h = historialCache.find(x => x._id === id)
+  if (!h) return
+  document.getElementById("mrec-id").value      = h._id
+  document.getElementById("mrec-usuario").value = h.id_usuario?._id || h.id_usuario || ""
+  document.getElementById("mrec-material").value = h.tipo_material
+  document.getElementById("mrec-cantidad").value = h.cantidad
+  document.getElementById("mrec-obs").value      = h.observaciones || ""
+  document.getElementById("mrec-usuario").disabled = true
+  document.querySelector("#modal-reciclaje h3").textContent = "♻️ Editar Reciclaje"
+  abrirModalReciclaje()
+}
+
+async function eliminarReciclaje(id) {
+  if (!confirm("¿Eliminar este registro de reciclaje? Se descontarán los puntos otorgados al usuario.")) return
+  try {
+    await fetch(API + "/api/admin/historial/" + id, { method: "DELETE", headers })
+    toast("✓ Reciclaje eliminado")
+    cargarReportes()
+  } catch { toast("✗ Error al eliminar") }
+}
+
+async function guardarReciclaje() {
+  const id = document.getElementById("mrec-id").value
+  const body = {
+    id_usuario:    document.getElementById("mrec-usuario").value,
+    tipo_material: document.getElementById("mrec-material").value,
+    cantidad:      parseFloat(document.getElementById("mrec-cantidad").value),
+    observaciones: document.getElementById("mrec-obs").value
+  }
+  try {
+    if (id) {
+      await fetch(API + "/api/admin/historial/" + id, { method: "PUT", headers, body: JSON.stringify(body) })
+      toast("✓ Reciclaje actualizado")
+    } else {
+      await fetch(API + "/api/admin/historial", { method: "POST", headers, body: JSON.stringify(body) })
+      toast("✓ Reciclaje registrado")
+    }
+    cerrarModal("modal-reciclaje")
+    cargarReportes()
+  } catch { toast("✗ Error al guardar") }
+}
+
+// ── MODALES ───────────────────────────────────────────────
+function abrirModalPunto()      { document.getElementById("modal-punto").classList.add("show") }
+function abrirModalRecompensa() { document.getElementById("modal-recompensa").classList.add("show") }
+function abrirModalReto()       { document.getElementById("modal-reto").classList.add("show") }
+
+async function abrirModalReciclaje() {
+  const select = document.getElementById("mrec-usuario")
+  if (!select.disabled && !select.dataset.cargado) {
+    try {
+      const res = await fetch(API + "/api/admin/usuarios", { headers })
+      const usuarios = await res.json()
+      select.innerHTML = '<option value="">Selecciona un usuario</option>' +
+        usuarios.map(u => `<option value="${u._id}">${u.nombre} (${u.correo})</option>`).join("")
+      select.dataset.cargado = "1"
+    } catch {}
+  }
+  document.getElementById("modal-reciclaje").classList.add("show")
+}
+
+function cerrarModal(id) {
+  document.getElementById(id).classList.remove("show")
+  if (id === "modal-punto") {
+    document.getElementById("mp-id").value = ""
+    document.querySelector("#modal-punto h3").textContent = "📍 Nuevo Punto Limpio"
+    document.querySelectorAll("#modal-punto input").forEach(i => i.value = "")
+  }
+  if (id === "modal-recompensa") {
+    document.getElementById("mr-id").value = ""
+    document.querySelector("#modal-recompensa h3").textContent = "🎁 Nueva Recompensa"
+    document.querySelectorAll("#modal-recompensa input, #modal-recompensa textarea").forEach(i => i.value = "")
+  }
+  if (id === "modal-reciclaje") {
+    document.getElementById("mrec-id").value = ""
+    document.getElementById("mrec-usuario").disabled = false
+    document.querySelector("#modal-reciclaje h3").textContent = "♻️ Registrar Reciclaje"
+    document.querySelectorAll("#modal-reciclaje input, #modal-reciclaje textarea").forEach(i => i.value = "")
+  }
+}
+
+async function guardarPunto() {
+  const id = document.getElementById("mp-id").value
+  const body = {
+    nombre_punto: document.getElementById("mp-nombre").value,
+    direccion:    document.getElementById("mp-dir").value,
+    lat:          parseFloat(document.getElementById("mp-lat").value),
+    lng:          parseFloat(document.getElementById("mp-lng").value),
+    codigo_qr:    document.getElementById("mp-qr").value,
+    materiales:   document.getElementById("mp-mat").value.split(",").map(m=>m.trim())
+  }
+  try {
+    if (id) {
+      await fetch(API + "/api/admin/puntos-limpios/" + id, { method:"PUT", headers, body: JSON.stringify(body) })
+      toast("✓ Punto limpio actualizado")
+    } else {
+      await fetch(API + "/api/admin/puntos-limpios", { method:"POST", headers, body: JSON.stringify(body) })
+      toast("✓ Punto limpio agregado")
+    }
+    cerrarModal("modal-punto")
+    cargarPuntosAdmin()
+  } catch { toast("✗ Error al guardar") }
+}
+
+async function guardarRecompensa() {
+  const id = document.getElementById("mr-id").value
+  const body = {
+    titulo:            document.getElementById("mr-titulo").value,
+    descripcion:       document.getElementById("mr-desc").value,
+    puntos_requeridos: parseInt(document.getElementById("mr-puntos").value),
+    stock:             parseInt(document.getElementById("mr-stock").value),
+    activo:            true
+  }
+  try {
+    if (id) {
+      await fetch(API + "/api/admin/beneficios/" + id, { method:"PUT", headers, body: JSON.stringify(body) })
+      toast("✓ Recompensa actualizada")
+    } else {
+      await fetch(API + "/api/admin/beneficios", { method:"POST", headers, body: JSON.stringify(body) })
+      toast("✓ Recompensa agregada")
+    }
+    cerrarModal("modal-recompensa")
+    cargarRecompensas()
+  } catch { toast("✗ Error al guardar") }
+}
+
+function guardarReto() {
+  toast("✓ Reto guardado (funcionalidad en desarrollo)")
+  cerrarModal("modal-reto")
+}
+
+// ── UTILIDADES ────────────────────────────────────────────
 function toast(msg) {
-  const t = el("toast")
-  if (!t) return
-  t.textContent   = msg
+  const t = document.getElementById("toast")
+  t.textContent  = msg
   t.style.display = "block"
   setTimeout(() => t.style.display = "none", 3000)
 }
 
-// ── MODAL helpers ───────────────────────────
-function abrirModal(id)  { const m = el(id); if (m) m.classList.add("show") }
-function cerrarModal(id) { const m = el(id); if (m) m.classList.remove("show") }
+function cerrarSesion() {
+  localStorage.removeItem("token")
+  localStorage.removeItem("usuario")
+  window.location.href = "index.html"
+}
 
+// Cerrar modal al hacer clic fuera
 document.querySelectorAll(".modal-overlay").forEach(m => {
   m.addEventListener("click", e => { if (e.target === m) m.classList.remove("show") })
 })
 
-// ── Helper seguro para obtener JSON ─────────
-
+// Cargar inicio al entrar
+cargarInicio()
 </script>
 </body>
 </html>
