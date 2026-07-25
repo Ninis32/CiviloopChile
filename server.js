@@ -268,7 +268,133 @@ app.post("/api/canjes", verificarJWT, async (req, res) => {
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
+// ==========================================
+// CRUD ADMIN: USUARIOS 
+// ==========================================
+app.post("/api/admin/usuarios", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol !== "admin") return res.status(403).json({ mensaje: "Sin permisos" });
+    const { nombre, correo, password, region, rol } = req.body;
+    const existe = await Usuario.findOne({ correo });
+    if (existe) return res.status(400).json({ mensaje: "El correo ya está registrado" });
+    
+    const nuevo = new Usuario({ nombre, correo, password, region, rol: rol || "ciudadano" });
+    await nuevo.save();
+    res.status(201).json({ mensaje: "Usuario creado", usuario: nuevo });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al crear usuario", error: err.message });
+  }
+});
 
+app.put("/api/admin/usuarios/:id", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol !== "admin") return res.status(403).json({ mensaje: "Sin permisos" });
+    const { nombre, correo, region, rol, puntos, activo } = req.body;
+    const actualizado = await Usuario.findByIdAndUpdate(req.params.id, { nombre, correo, region, rol, puntos, activo }, { new: true }).select("-password");
+    res.json({ mensaje: "Usuario actualizado", usuario: actualizado });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al actualizar usuario", error: err.message });
+  }
+});
+
+app.delete("/api/admin/usuarios/:id", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol !== "admin") return res.status(403).json({ mensaje: "Sin permisos" });
+    await Usuario.findByIdAndDelete(req.params.id);
+    res.json({ mensaje: "Usuario eliminado" });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al eliminar usuario", error: err.message });
+  }
+});
+
+// ==========================================
+// CRUD ADMIN: PUNTOS LIMPIOS 
+// ==========================================
+app.get("/api/admin/puntos-limpios", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol !== "admin") return res.status(403).json({ mensaje: "Sin permisos" });
+    const puntos = await PuntoLimpio.find().sort({ fecha_creacion: -1 });
+    res.json(puntos);
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al obtener puntos limpios", error: err.message });
+  }
+});
+
+app.put("/api/admin/puntos-limpios/:id", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol !== "admin") return res.status(403).json({ mensaje: "Sin permisos" });
+    const { nombre_punto, direccion, lat, lng, codigo_qr, materiales, activo } = req.body;
+    const actualizado = await PuntoLimpio.findByIdAndUpdate(req.params.id, { nombre_punto, direccion, lat, lng, codigo_qr, materiales, activo }, { new: true });
+    res.json({ mensaje: "Punto limpio actualizado", punto: actualizado });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al actualizar punto limpio", error: err.message });
+  }
+});
+
+app.delete("/api/admin/puntos-limpios/:id", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol !== "admin") return res.status(403).json({ mensaje: "Sin permisos" });
+    await PuntoLimpio.findByIdAndDelete(req.params.id);
+    res.json({ mensaje: "Punto limpio eliminado" });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al eliminar punto limpio", error: err.message });
+  }
+});
+
+// ==========================================
+// CRUD ADMIN: BENEFICIOS / RECOMPENSAS (Completado)
+// ==========================================
+app.get("/api/admin/beneficios", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol !== "admin") return res.status(403).json({ mensaje: "Sin permisos" });
+    const beneficios = await Beneficio.find().sort({ fecha_creacion: -1 });
+    res.json(beneficios);
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al obtener beneficios", error: err.message });
+  }
+});
+
+app.put("/api/admin/beneficios/:id", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol !== "admin") return res.status(403).json({ mensaje: "Sin permisos" });
+    const { titulo, descripcion, puntos_requeridos, stock, activo } = req.body;
+    const actualizado = await Beneficio.findByIdAndUpdate(req.params.id, { titulo, descripcion, puntos_requeridos, stock, activo }, { new: true });
+    res.json({ mensaje: "Beneficio actualizado", beneficio: actualizado });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al actualizar beneficio", error: err.message });
+  }
+});
+
+app.delete("/api/admin/beneficios/:id", verificarJWT, async (req, res) => {
+  try {
+    if (req.user.rol !== "admin") return res.status(403).json({ mensaje: "Sin permisos" });
+    await Beneficio.findByIdAndDelete(req.params.id);
+    res.json({ mensaje: "Beneficio eliminado" });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al eliminar beneficio", error: err.message });
+  }
+});
+// ── DELETE /api/historial/:id — eliminar reciclaje (ciudadano)
+app.delete("/api/historial/:id", verificarJWT, async (req, res) => {
+  try {
+    const registro = await Historial.findById(req.params.id);
+    if (!registro) return res.status(404).json({ mensaje: "Registro no encontrado" });
+    
+    // Solo el dueño puede eliminar su propio reciclaje
+    if (registro.id_usuario.toString() !== req.user.id)
+      return res.status(403).json({ mensaje: "Sin permisos para eliminar este registro" });
+
+    // Devolver los puntos al usuario
+    await Usuario.findByIdAndUpdate(req.user.id, { 
+      $inc: { puntos_totales: -registro.puntos_ganados } 
+    });
+
+    await Historial.findByIdAndDelete(req.params.id);
+    res.json({ mensaje: "Reciclaje eliminado", puntos_devueltos: registro.puntos_ganados });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al eliminar reciclaje", error: err.message });
+  }
+});
 app.listen(process.env.PORT || 3000, () => {
   console.log("Servidor en puerto", process.env.PORT || 3000);
   console.log("Abre: https://civiloopchile.onrender.com");

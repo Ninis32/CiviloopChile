@@ -591,307 +591,75 @@ const API     = window.location.port === "5500" ? "https://civiloopchile.onrende
 if (!token || !usuario) window.location.href = "index.html"
 if (usuario.rol === "ciudadano") window.location.href = "dashboard.html"
 
-// Mostrar nombre admin
-document.getElementById("admin-nombre").textContent = usuario.nombre
-document.getElementById("avatar-letra").textContent = usuario.nombre?.charAt(0).toUpperCase()
-document.getElementById("cfg-nombre").value = usuario.nombre
-document.getElementById("cfg-correo").value = usuario.correo
-
-// Fecha actual
-const ahora = new Date()
-document.getElementById("topbar-fecha").textContent =
-  ahora.toLocaleDateString("es-CL", { weekday:"long", year:"numeric", month:"long", day:"numeric" })
-
-// ── Navegación ────────────────────────────────────────────
-const titulos = {
-  inicio:"🏠 Inicio", estadisticas:"📊 Estadísticas",
-  usuarios:"👥 Usuarios", puntos:"📍 Puntos Limpios",
-  recompensas:"🎁 Recompensas", retos:"🏆 Retos",
-  reportes:"📋 Reportes", configuracion:"⚙️ Configuración"
-}
-
-function mostrar(id) {
-  document.querySelectorAll(".seccion").forEach(s => s.classList.remove("active"))
-  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"))
-  document.getElementById("sec-" + id).classList.add("active")
-  event.currentTarget.classList.add("active")
-  document.getElementById("topbar-titulo").textContent = titulos[id]
-
-  // Cargar datos según sección
-  if (id === "inicio")       cargarInicio()
-  if (id === "estadisticas") cargarEstadisticas()
-  if (id === "usuarios")     cargarUsuarios()
-  if (id === "puntos")       cargarPuntosAdmin()
-  if (id === "recompensas")  cargarRecompensas()
-  if (id === "reportes")     cargarReportes()
-}
-
-// ── HEADERS ───────────────────────────────────────────────
+// Header común para todas las peticiones
 const headers = {
   "Content-Type": "application/json",
   "Authorization": "Bearer " + token
 }
 
-// ── INICIO ────────────────────────────────────────────────
-async function cargarInicio() {
-  try {
-    const [rUsuarios, rPuntos] = await Promise.all([
-      fetch(API + "/api/admin/usuarios", { headers }),
-      fetch(API + "/api/puntos-limpios", { headers }),
-    ])
-    const usuarios = await rUsuarios.json()
-    const puntos   = await rPuntos.json()
+// Mostrar info admin
+const el = id => document.getElementById(id)
+if (el("admin-nombre"))  el("admin-nombre").textContent  = usuario.nombre
+if (el("avatar-letra"))  el("avatar-letra").textContent  = usuario.nombre?.charAt(0).toUpperCase()
+if (el("cfg-nombre"))    el("cfg-nombre").value          = usuario.nombre
+if (el("cfg-correo"))    el("cfg-correo").value          = usuario.correo
 
-    document.getElementById("stat-usuarios").textContent = Array.isArray(usuarios) ? usuarios.length : "—"
-    document.getElementById("stat-puntos").textContent   = Array.isArray(puntos)   ? puntos.length   : "—"
-    document.getElementById("stat-reciclajes").textContent = "—"
-    document.getElementById("stat-canjes").textContent     = "—"
-
-    if (Array.isArray(usuarios)) {
-      const tbody = document.getElementById("tabla-ultimos-usuarios")
-      tbody.innerHTML = usuarios.slice(0,5).map(u => `
-        <tr>
-          <td>${u.nombre}</td>
-          <td>${u.correo}</td>
-          <td>${u.region}</td>
-          <td><strong style="color:#2E8B57">${u.puntos_totales}</strong></td>
-          <td><span class="badge ${u.activo ? 'badge-verde':'badge-rojo'}">${u.activo ? 'Activo':'Bloqueado'}</span></td>
-        </tr>
-      `).join("")
-    }
-  } catch { }
+// Fecha en topbar
+const ahora = new Date()
+if (el("topbar-fecha")) {
+  el("topbar-fecha").textContent = ahora.toLocaleDateString("es-CL", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric"
+  })
 }
 
-// ── ESTADÍSTICAS ──────────────────────────────────────────
-async function cargarEstadisticas() {
-  try {
-    const res = await fetch(API + "/api/admin/usuarios", { headers })
-    const usuarios = await res.json()
-    if (!Array.isArray(usuarios)) return
-
-    const totalPuntos = usuarios.reduce((s,u) => s + (u.puntos_totales||0), 0)
-    document.getElementById("stat-puntos-total").textContent = totalPuntos
-    document.getElementById("stat-kg").textContent = Math.round(totalPuntos / 5)
-
-    // Top usuarios
-    const top = [...usuarios].sort((a,b) => b.puntos_totales - a.puntos_totales).slice(0,5)
-    document.getElementById("tabla-top-usuarios").innerHTML = top.map((u,i) => `
-      <tr>
-        <td>${["🥇","🥈","🥉","4°","5°"][i]}</td>
-        <td>${u.nombre}</td>
-        <td>${u.correo}</td>
-        <td><strong style="color:#2E8B57">${u.puntos_totales}</strong></td>
-      </tr>
-    `).join("")
-
-    // Gráfico materiales (simulado)
-    const materiales = [
-      { label:"Plástico", val:42 },
-      { label:"Vidrio",   val:28 },
-      { label:"Papel",    val:18 },
-      { label:"Metal",    val:8  },
-      { label:"Cartón",   val:4  },
-    ]
-    const max = Math.max(...materiales.map(m=>m.val))
-    document.getElementById("grafico-materiales").innerHTML =
-      materiales.map(m=>`
-        <div class="bar-wrap">
-          <div class="bar-val">${m.val}%</div>
-          <div class="bar" style="height:${(m.val/max)*100}px"></div>
-          <div class="bar-label">${m.label}</div>
-        </div>
-      `).join("")
-  } catch {}
+// ── Navegación ──────────────────────────────
+const titulos = {
+  inicio:        "🏠 Inicio",
+  estadisticas:  "📊 Estadísticas",
+  usuarios:      "👥 Usuarios",
+  puntos:        "📍 Puntos Limpios",
+  recompensas:   "🎁 Recompensas",
+  retos:         "🏆 Retos",
+  reportes:      "📋 Reportes",
+  configuracion: "⚙️ Configuración"
 }
 
-// ── USUARIOS ──────────────────────────────────────────────
-let todosUsuarios = []
+function mostrar(id, evento) {
+  document.querySelectorAll(".seccion").forEach(s => s.classList.remove("active"))
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"))
+  const sec = el("sec-" + id)
+  if (sec) sec.classList.add("active")
+  if (evento && evento.currentTarget) evento.currentTarget.classList.add("active")
+  if (el("topbar-titulo")) el("topbar-titulo").textContent = titulos[id] || id
 
-async function cargarUsuarios() {
-  try {
-    const res = await fetch(API + "/api/admin/usuarios", { headers })
-    todosUsuarios = await res.json()
-    if (!Array.isArray(todosUsuarios)) {
-      document.getElementById("tabla-usuarios").innerHTML =
-        '<tr><td colspan="7" style="text-align:center;color:#aaa">Sin datos disponibles</td></tr>'
-      return
-    }
-    renderUsuarios(todosUsuarios)
-  } catch {
-    document.getElementById("tabla-usuarios").innerHTML =
-      '<tr><td colspan="7" style="text-align:center;color:#aaa">Error al cargar usuarios</td></tr>'
-  }
+  if (id === "inicio")       cargarInicio()
+  if (id === "estadisticas") cargarEstadisticas()
+  if (id === "usuarios")     cargarUsuarios()
+  if (id === "puntos")       cargarPuntosAdmin()
+  if (id === "recompensas")  cargarRecompensas()
+  if (id === "retos")        renderRetos()
+  if (id === "reportes")     cargarReportes()
 }
 
-function renderUsuarios(lista) {
-  document.getElementById("tabla-usuarios").innerHTML = lista.map(u => `
-    <tr>
-      <td>${u.nombre}</td>
-      <td>${u.correo}</td>
-      <td>${u.region}</td>
-      <td><span class="badge ${u.rol==='ciudadano'?'badge-azul':'badge-verde'}">${u.rol}</span></td>
-      <td><strong style="color:#2E8B57">${u.puntos_totales}</strong></td>
-      <td><span class="badge ${u.activo?'badge-verde':'badge-rojo'}">${u.activo?'Activo':'Bloqueado'}</span></td>
-      <td>
-        <button class="btn-accion ${u.activo?'btn-bloquear':'btn-activar'}"
-          onclick="toggleUsuario('${u._id}', ${u.activo})">
-          ${u.activo ? 'Bloquear' : 'Activar'}
-        </button>
-      </td>
-    </tr>
-  `).join("")
-}
-
-function filtrarUsuarios() {
-  const q = document.getElementById("buscar-usuario").value.toLowerCase()
-  renderUsuarios(todosUsuarios.filter(u =>
-    u.nombre.toLowerCase().includes(q) || u.correo.toLowerCase().includes(q)
-  ))
-}
-
-async function toggleUsuario(id, activo) {
-  try {
-    await fetch(API + "/api/admin/usuarios/" + id + "/estado", {
-      method: "PUT",
-      headers,
-      body: JSON.stringify({ activo: !activo })
-    })
-    toast(activo ? "✓ Usuario bloqueado" : "✓ Usuario activado")
-    cargarUsuarios()
-  } catch { toast("✗ Error al actualizar usuario") }
-}
-
-// ── PUNTOS LIMPIOS ────────────────────────────────────────
-async function cargarPuntosAdmin() {
-  try {
-    const res = await fetch(API + "/api/puntos-limpios", { headers })
-    const data = await res.json()
-    if (!Array.isArray(data) || !data.length) {
-      document.getElementById("tabla-puntos").innerHTML =
-        '<tr><td colspan="6" style="text-align:center;color:#aaa">No hay puntos limpios registrados</td></tr>'
-      return
-    }
-    document.getElementById("tabla-puntos").innerHTML = data.map(p => `
-      <tr>
-        <td>${p.nombre_punto}</td>
-        <td>${p.direccion}</td>
-        <td>${(p.materiales||[]).join(", ")}</td>
-        <td><span class="badge badge-gris">${p.codigo_qr}</span></td>
-        <td><span class="badge ${p.activo?'badge-verde':'badge-rojo'}">${p.activo?'Activo':'Inactivo'}</span></td>
-        <td>
-          <button class="btn-accion btn-editar">Editar</button>
-          <button class="btn-accion btn-bloquear">Desactivar</button>
-        </td>
-      </tr>
-    `).join("")
-  } catch {
-    document.getElementById("tabla-puntos").innerHTML =
-      '<tr><td colspan="6" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
-  }
-}
-
-// ── RECOMPENSAS ───────────────────────────────────────────
-async function cargarRecompensas() {
-  try {
-    const res = await fetch(API + "/api/beneficios", { headers })
-    const data = await res.json()
-    if (!Array.isArray(data) || !data.length) {
-      document.getElementById("tabla-recompensas").innerHTML =
-        '<tr><td colspan="6" style="text-align:center;color:#aaa">No hay recompensas registradas</td></tr>'
-      return
-    }
-    document.getElementById("tabla-recompensas").innerHTML = data.map(b => `
-      <tr>
-        <td>${b.titulo || "—"}</td>
-        <td>${b.descripcion || "—"}</td>
-        <td><strong style="color:#2E8B57">${b.puntos_requeridos} pts</strong></td>
-        <td>${b.stock}</td>
-        <td><span class="badge ${b.activo?'badge-verde':'badge-rojo'}">${b.activo?'Activo':'Inactivo'}</span></td>
-        <td>
-          <button class="btn-accion btn-editar">Editar</button>
-          <button class="btn-accion btn-eliminar">Eliminar</button>
-        </td>
-      </tr>
-    `).join("")
-  } catch {
-    document.getElementById("tabla-recompensas").innerHTML =
-      '<tr><td colspan="6" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
-  }
-}
-
-// ── REPORTES ──────────────────────────────────────────────
-async function cargarReportes() {
-  document.getElementById("tabla-reportes").innerHTML =
-    '<tr><td colspan="6" style="text-align:center;color:#aaa">Conectar endpoint /api/admin/historial</td></tr>'
-  document.getElementById("tabla-reportes-canjes").innerHTML =
-    '<tr><td colspan="5" style="text-align:center;color:#aaa">Conectar endpoint /api/admin/canjes</td></tr>'
-}
-
-// ── MODALES ───────────────────────────────────────────────
-function abrirModalPunto()      { document.getElementById("modal-punto").classList.add("show") }
-function abrirModalRecompensa() { document.getElementById("modal-recompensa").classList.add("show") }
-function abrirModalReto()       { document.getElementById("modal-reto").classList.add("show") }
-function cerrarModal(id)        { document.getElementById(id).classList.remove("show") }
-
-async function guardarPunto() {
-  const body = {
-    nombre_punto: document.getElementById("mp-nombre").value,
-    direccion:    document.getElementById("mp-dir").value,
-    lat:          parseFloat(document.getElementById("mp-lat").value),
-    lng:          parseFloat(document.getElementById("mp-lng").value),
-    codigo_qr:    document.getElementById("mp-qr").value,
-    materiales:   document.getElementById("mp-mat").value.split(",").map(m=>m.trim())
-  }
-  try {
-    await fetch(API + "/api/admin/puntos-limpios", { method:"POST", headers, body: JSON.stringify(body) })
-    cerrarModal("modal-punto")
-    toast("✓ Punto limpio agregado")
-    cargarPuntosAdmin()
-  } catch { toast("✗ Error al guardar") }
-}
-
-async function guardarRecompensa() {
-  const body = {
-    titulo:            document.getElementById("mr-titulo").value,
-    descripcion:       document.getElementById("mr-desc").value,
-    puntos_requeridos: parseInt(document.getElementById("mr-puntos").value),
-    stock:             parseInt(document.getElementById("mr-stock").value),
-    activo:            true
-  }
-  try {
-    await fetch(API + "/api/admin/beneficios", { method:"POST", headers, body: JSON.stringify(body) })
-    cerrarModal("modal-recompensa")
-    toast("✓ Recompensa agregada")
-    cargarRecompensas()
-  } catch { toast("✗ Error al guardar") }
-}
-
-function guardarReto() {
-  toast("✓ Reto guardado (funcionalidad en desarrollo)")
-  cerrarModal("modal-reto")
-}
-
-// ── UTILIDADES ────────────────────────────────────────────
+// ── TOAST (solo una vez) ────────────────────
 function toast(msg) {
-  const t = document.getElementById("toast")
-  t.textContent  = msg
+  const t = el("toast")
+  if (!t) return
+  t.textContent   = msg
   t.style.display = "block"
   setTimeout(() => t.style.display = "none", 3000)
 }
 
-function cerrarSesion() {
-  localStorage.removeItem("token")
-  localStorage.removeItem("usuario")
-  window.location.href = "index.html"
-}
+// ── MODAL helpers ───────────────────────────
+function abrirModal(id)  { const m = el(id); if (m) m.classList.add("show") }
+function cerrarModal(id) { const m = el(id); if (m) m.classList.remove("show") }
 
-// Cerrar modal al hacer clic fuera
 document.querySelectorAll(".modal-overlay").forEach(m => {
   m.addEventListener("click", e => { if (e.target === m) m.classList.remove("show") })
 })
 
-// Cargar inicio al entrar
-cargarInicio()
+// ── Helper seguro para obtener JSON ─────────
+
 </script>
 </body>
 </html>
