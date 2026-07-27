@@ -223,6 +223,7 @@
   <a href="#" onclick="mostrar('usuarios', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">👥 Usuarios</a>
   <a href="#" onclick="mostrar('puntos', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">📍 Puntos Limpios</a>
   <a href="#" onclick="mostrar('recompensas', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">🎁 Recompensas</a>
+  <a href="#" onclick="mostrar('tarifas', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">💰 Tarifas de Puntos</a>
   <a href="#" onclick="mostrar('retos', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">🏆 Retos</a>
   <a href="#" onclick="mostrar('reportes', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">📋 Reportes</a>
   <a href="#" onclick="mostrar('configuracion', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">⚙️ Configuración</a>
@@ -324,9 +325,12 @@
       <div class="card">
         <div class="card-header">
           <h3>👥 Gestión de Usuarios</h3>
-          <input type="text" id="buscar-usuario" placeholder="🔍 Buscar usuario..."
-            oninput="filtrarUsuarios()"
-            style="padding:0.4rem 0.75rem;border:1px solid #ddd;border-radius:8px;font-size:0.85rem;width:200px">
+          <div style="display:flex;gap:0.5rem">
+            <input type="text" id="buscar-usuario" placeholder="🔍 Buscar usuario..."
+              oninput="filtrarUsuarios()"
+              style="padding:0.4rem 0.75rem;border:1px solid #ddd;border-radius:8px;font-size:0.85rem;width:170px">
+            <button class="btn-add" onclick="abrirModalUsuarioNuevo()">+ Agregar usuario</button>
+          </div>
         </div>
         <table>
           <thead>
@@ -370,6 +374,27 @@
           </thead>
           <tbody id="tabla-recompensas">
             <tr><td colspan="6" style="text-align:center;color:#aaa">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TARIFAS ── -->
+    <div class="seccion" id="sec-tarifas">
+      <div class="card">
+        <div class="card-header">
+          <h3>💰 Tarifas de Puntos por Material</h3>
+          <button class="btn-add" onclick="abrirModalTarifaNueva()">+ Agregar material</button>
+        </div>
+        <p style="font-size:0.82rem;color:#888;margin-top:-0.5rem">
+          Define cuántos puntos vale cada kilo según el material. Los materiales sin tarifa usan 5 pts/kg por defecto.
+        </p>
+        <table>
+          <thead>
+            <tr><th>Material</th><th>Puntos por Kg</th><th>Estado</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="tabla-tarifas">
+            <tr><td colspan="4" style="text-align:center;color:#aaa">Cargando...</td></tr>
           </tbody>
         </table>
       </div>
@@ -484,12 +509,14 @@
 <!-- ── MODAL PUNTO LIMPIO ── -->
 <div class="modal-overlay" id="modal-usuario">
   <div class="modal">
-    <h3>👤 Editar Usuario</h3>
+    <h3 id="mu-titulo">👤 Editar Usuario</h3>
     <input type="hidden" id="mu-id" value="">
     <label>Nombre</label>
     <input type="text" id="mu-nombre" placeholder="Nombre completo">
     <label>Correo</label>
     <input type="email" id="mu-correo" placeholder="correo@ejemplo.cl">
+    <label id="mu-pass-label" style="display:none">Contraseña</label>
+    <input type="password" id="mu-password" placeholder="Contraseña inicial" style="display:none">
     <label>Región</label>
     <input type="text" id="mu-region" placeholder="Región Metropolitana">
     <label>Rol</label>
@@ -543,6 +570,21 @@
     <div class="modal-btns">
       <button class="btn-cancelar" onclick="cerrarModal('modal-recompensa')">Cancelar</button>
       <button class="btn-guardar" onclick="guardarRecompensa()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-tarifa">
+  <div class="modal">
+    <h3 id="mt-titulo">💰 Nueva Tarifa</h3>
+    <input type="hidden" id="mt-id" value="">
+    <label>Material</label>
+    <input type="text" id="mt-material" placeholder="Ej: Aluminio">
+    <label>Puntos por Kg</label>
+    <input type="number" id="mt-puntos" placeholder="15">
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="cerrarModal('modal-tarifa')">Cancelar</button>
+      <button class="btn-guardar" onclick="guardarTarifa()">Guardar</button>
     </div>
   </div>
 </div>
@@ -613,7 +655,7 @@ document.getElementById("topbar-fecha").textContent =
 const titulos = {
   inicio:"🏠 Inicio", estadisticas:"📊 Estadísticas",
   usuarios:"👥 Usuarios", puntos:"📍 Puntos Limpios",
-  recompensas:"🎁 Recompensas", retos:"🏆 Retos",
+  recompensas:"🎁 Recompensas", tarifas:"💰 Tarifas de Puntos", retos:"🏆 Retos",
   reportes:"📋 Reportes", configuracion:"⚙️ Configuración"
 }
 
@@ -630,6 +672,7 @@ function mostrar(id) {
   if (id === "usuarios")     cargarUsuarios()
   if (id === "puntos")       cargarPuntosAdmin()
   if (id === "recompensas")  cargarRecompensas()
+  if (id === "tarifas")      cargarTarifas()
   if (id === "reportes")     cargarReportes()
 }
 
@@ -770,6 +813,19 @@ async function toggleUsuario(id, activo) {
   } catch { toast("✗ Error al actualizar usuario") }
 }
 
+function abrirModalUsuarioNuevo() {
+  document.getElementById("mu-id").value      = ""
+  document.getElementById("mu-nombre").value  = ""
+  document.getElementById("mu-correo").value  = ""
+  document.getElementById("mu-region").value  = ""
+  document.getElementById("mu-rol").value     = "ciudadano"
+  document.getElementById("mu-titulo").textContent = "👤 Agregar Usuario"
+  document.getElementById("mu-pass-label").style.display = "block"
+  document.getElementById("mu-password").style.display   = "block"
+  document.getElementById("mu-password").value = ""
+  document.getElementById("modal-usuario").classList.add("show")
+}
+
 function editarUsuario(id) {
   const u = todosUsuarios.find(x => x._id === id)
   if (!u) return
@@ -778,6 +834,9 @@ function editarUsuario(id) {
   document.getElementById("mu-correo").value = u.correo
   document.getElementById("mu-region").value = u.region
   document.getElementById("mu-rol").value    = u.rol
+  document.getElementById("mu-titulo").textContent = "👤 Editar Usuario"
+  document.getElementById("mu-pass-label").style.display = "none"
+  document.getElementById("mu-password").style.display   = "none"
   document.getElementById("modal-usuario").classList.add("show")
 }
 
@@ -790,10 +849,17 @@ async function guardarUsuario() {
     rol:    document.getElementById("mu-rol").value
   }
   try {
-    const res  = await fetch(API + "/api/admin/usuarios/" + id, { method:"PUT", headers, body: JSON.stringify(body) })
+    let res
+    if (id) {
+      res = await fetch(API + "/api/admin/usuarios/" + id, { method:"PUT", headers, body: JSON.stringify(body) })
+    } else {
+      body.password = document.getElementById("mu-password").value
+      if (!body.password) { toast("✗ La contraseña es obligatoria"); return }
+      res = await fetch(API + "/api/admin/usuarios", { method:"POST", headers, body: JSON.stringify(body) })
+    }
     const data = await res.json()
     if (!res.ok) { toast("✗ " + data.mensaje); return }
-    toast("✓ Usuario actualizado")
+    toast(id ? "✓ Usuario actualizado" : "✓ Usuario creado")
     cerrarModal("modal-usuario")
     cargarUsuarios()
   } catch { toast("✗ Error al guardar") }
@@ -919,6 +985,89 @@ async function eliminarRecompensa(id) {
   } catch { toast("✗ Error al eliminar") }
 }
 
+// ── TARIFAS DE PUNTOS POR MATERIAL ──────────────────────────
+let tarifasCache = []
+
+async function cargarTarifas() {
+  try {
+    const res = await fetch(API + "/api/admin/tarifas", { headers })
+    const data = await res.json()
+    tarifasCache = Array.isArray(data) ? data : []
+    if (!tarifasCache.length) {
+      document.getElementById("tabla-tarifas").innerHTML =
+        '<tr><td colspan="4" style="text-align:center;color:#aaa">No hay tarifas registradas</td></tr>'
+      return
+    }
+    document.getElementById("tabla-tarifas").innerHTML = tarifasCache.map(t => `
+      <tr>
+        <td>${t.material}</td>
+        <td><strong style="color:#2E8B57">${t.puntos_por_kg} pts/kg</strong></td>
+        <td><span class="badge ${t.activo?'badge-verde':'badge-rojo'}">${t.activo?'Activo':'Inactivo'}</span></td>
+        <td>
+          <button class="btn-accion btn-editar" onclick="editarTarifa('${t._id}')">Editar</button>
+          <button class="btn-accion btn-eliminar" onclick="eliminarTarifa('${t._id}')">Eliminar</button>
+        </td>
+      </tr>
+    `).join("")
+  } catch {
+    document.getElementById("tabla-tarifas").innerHTML =
+      '<tr><td colspan="4" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+  }
+}
+
+function abrirModalTarifaNueva() {
+  document.getElementById("mt-id").value       = ""
+  document.getElementById("mt-material").value = ""
+  document.getElementById("mt-puntos").value   = ""
+  document.getElementById("mt-titulo").textContent = "💰 Nueva Tarifa"
+  document.getElementById("modal-tarifa").classList.add("show")
+}
+
+function editarTarifa(id) {
+  const t = tarifasCache.find(x => x._id === id)
+  if (!t) return
+  document.getElementById("mt-id").value       = t._id
+  document.getElementById("mt-material").value = t.material
+  document.getElementById("mt-puntos").value   = t.puntos_por_kg
+  document.getElementById("mt-titulo").textContent = "💰 Editar Tarifa"
+  document.getElementById("modal-tarifa").classList.add("show")
+}
+
+async function guardarTarifa() {
+  const id = document.getElementById("mt-id").value
+  const body = {
+    material:      document.getElementById("mt-material").value,
+    puntos_por_kg: parseFloat(document.getElementById("mt-puntos").value),
+    activo: true
+  }
+  if (!body.material || !body.puntos_por_kg || body.puntos_por_kg <= 0) {
+    toast("✗ Completa material y puntos por kg")
+    return
+  }
+  try {
+    let res
+    if (id) {
+      res = await fetch(API + "/api/admin/tarifas/" + id, { method:"PUT", headers, body: JSON.stringify(body) })
+    } else {
+      res = await fetch(API + "/api/admin/tarifas", { method:"POST", headers, body: JSON.stringify(body) })
+    }
+    const data = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast(id ? "✓ Tarifa actualizada" : "✓ Tarifa creada")
+    cerrarModal("modal-tarifa")
+    cargarTarifas()
+  } catch { toast("✗ Error al guardar") }
+}
+
+async function eliminarTarifa(id) {
+  if (!confirm("¿Eliminar esta tarifa? El material volverá a usar el valor por defecto (5 pts/kg).")) return
+  try {
+    await fetch(API + "/api/admin/tarifas/" + id, { method: "DELETE", headers })
+    toast("✓ Tarifa eliminada")
+    cargarTarifas()
+  } catch { toast("✗ Error al eliminar") }
+}
+
 // ── REPORTES / RECICLAJE (CRUD) ────────────────────────────
 async function cargarReportes() {
   try {
@@ -1041,6 +1190,12 @@ function cerrarModal(id) {
   if (id === "modal-usuario") {
     document.getElementById("mu-id").value = ""
     document.querySelectorAll("#modal-usuario input").forEach(i => i.value = "")
+    document.getElementById("mu-pass-label").style.display = "none"
+    document.getElementById("mu-password").style.display   = "none"
+  }
+  if (id === "modal-tarifa") {
+    document.getElementById("mt-id").value = ""
+    document.querySelectorAll("#modal-tarifa input").forEach(i => i.value = "")
   }
   if (id === "modal-punto") {
     document.getElementById("mp-id").value = ""
