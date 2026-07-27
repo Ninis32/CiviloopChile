@@ -65,34 +65,6 @@ const Canje = mongoose.model("Canje", new mongoose.Schema({
   estado_canje:      { type: String, default: "pendiente" }
 }));
 
-// Tarifa de puntos por Kg segun el material (el aluminio no vale lo mismo
-// que el vidrio). Si un material no tiene tarifa cargada, se usa un valor
-// por defecto para que el registro nunca falle.
-const TarifaMaterial = mongoose.model("TarifaMaterial", new mongoose.Schema({
-  material:       { type: String, required: true, unique: true },
-  puntos_por_kg:  { type: Number, required: true },
-  activo:         { type: Boolean, default: true }
-}));
-
-const PUNTOS_POR_DEFECTO = 5;
-
-// Siembra tarifas base la primera vez que corre el servidor, para que la
-// tabla no aparezca vacia en la demo.
-async function sembrarTarifas() {
-  const existentes = await TarifaMaterial.countDocuments();
-  if (existentes > 0) return;
-  await TarifaMaterial.insertMany([
-    { material: "Aluminio",     puntos_por_kg: 15 },
-    { material: "Metal",        puntos_por_kg: 12 },
-    { material: "Plástico",     puntos_por_kg: 8  },
-    { material: "Vidrio",       puntos_por_kg: 5  },
-    { material: "Papel",        puntos_por_kg: 4  },
-    { material: "Cartón",       puntos_por_kg: 4  }
-  ]);
-  console.log("Tarifas de materiales sembradas por defecto");
-}
-sembrarTarifas().catch(err => console.log("Error sembrando tarifas:", err));
-
 // ── Middleware JWT ──────────────────────────
 function verificarJWT(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1];
@@ -258,11 +230,7 @@ app.post("/api/reciclaje/qr", verificarJWT, async (req, res) => {
     const { tipo_material, cantidad, id_punto, codigo_qr, observaciones } = req.body;
     const punto = await PuntoLimpio.findOne({ _id: id_punto, codigo_qr, activo: true });
     if (!punto) return res.status(404).json({ mensaje: "QR o punto limpio invalido" });
-
-    const tarifa = await TarifaMaterial.findOne({ material: tipo_material, activo: true });
-    const puntos_por_kg = tarifa ? tarifa.puntos_por_kg : PUNTOS_POR_DEFECTO;
-    const puntos_ganados = Math.max(puntos_por_kg, Math.round((cantidad || 1) * puntos_por_kg));
-
+    const puntos_ganados = Math.max(5, Math.round((cantidad || 1) * 5));
     await new Historial({
       id_usuario:   req.user.id,
       id_punto:     punto._id,
@@ -361,7 +329,7 @@ app.post("/api/admin/beneficios", verificarJWT, async (req, res) => {
 
 // ── Middleware admin reutilizable ───────────────────────────
 function soloAdmin(req, res, next) {
-  if (req.user.rol !== "administrador")
+  if (req.user.rol === "ciudadano")
     return res.status(403).json({ mensaje: "Sin permisos" });
   next();
 }
@@ -478,9 +446,7 @@ app.post("/api/admin/historial", verificarJWT, soloAdmin, async (req, res) => {
       const punto = await PuntoLimpio.findById(id_punto);
       if (punto) nombre_punto = punto.nombre_punto;
     }
-    const tarifa = await TarifaMaterial.findOne({ material: tipo_material, activo: true });
-    const puntos_por_kg = tarifa ? tarifa.puntos_por_kg : PUNTOS_POR_DEFECTO;
-    const puntos_ganados = Math.max(puntos_por_kg, Math.round((cantidad || 1) * puntos_por_kg));
+    const puntos_ganados = Math.max(5, Math.round((cantidad || 1) * 5));
     const nuevo = await new Historial({
       id_usuario, id_punto: id_punto || undefined, nombre_punto,
       tipo_material, cantidad, puntos_ganados, observaciones
@@ -501,9 +467,7 @@ app.put("/api/admin/historial/:id", verificarJWT, soloAdmin, async (req, res) =>
     if (!anterior) return res.status(404).json({ mensaje: "Registro no encontrado" });
 
     const { tipo_material, cantidad, observaciones } = req.body;
-    const tarifa = await TarifaMaterial.findOne({ material: tipo_material, activo: true });
-    const puntos_por_kg = tarifa ? tarifa.puntos_por_kg : PUNTOS_POR_DEFECTO;
-    const nuevos_puntos = Math.max(puntos_por_kg, Math.round((cantidad || 1) * puntos_por_kg));
+    const nuevos_puntos = Math.max(5, Math.round((cantidad || 1) * 5));
     const diferencia = nuevos_puntos - anterior.puntos_ganados;
 
     anterior.tipo_material  = tipo_material;
@@ -544,105 +508,5 @@ app.get("/api/admin/canjes", verificarJWT, soloAdmin, async (req, res) => {
     res.json(canjes);
   } catch {
     res.status(500).json({ mensaje: "Error al obtener canjes" });
-  }
-});
-
-// ══════════════════ CRUD: TARIFAS DE PUNTOS POR MATERIAL ══════════════════
-
-// GET /api/admin/tarifas — listar todas (activas e inactivas)
-app.get("/api/admin/tarifas", verificarJWT, soloAdmin, async (req, res) => {
-  try {
-    const tarifas = await TarifaMaterial.find().sort({ material: 1 });
-    res.json(tarifas);
-  } catch {
-    res.status(500).json({ mensaje: "Error al obtener tarifas" });
-  }
-});
-
-// POST /api/admin/tarifas — crear tarifa de un material nuevo
-app.post("/api/admin/tarifas", verificarJWT, soloAdmin, async (req, res) => {
-  try {
-    const { material, puntos_por_kg } = req.body;
-    if (!material || !puntos_por_kg || puntos_por_kg <= 0)
-      return res.status(400).json({ mensaje: "Material y puntos por kg son obligatorios" });
-    if (await TarifaMaterial.findOne({ material }))
-      return res.status(400).json({ mensaje: "Ese material ya tiene una tarifa registrada" });
-    const nueva = await new TarifaMaterial({ material, puntos_por_kg }).save();
-    res.json({ mensaje: "Tarifa creada", tarifa: nueva });
-  } catch {
-    res.status(500).json({ mensaje: "Error al crear tarifa" });
-  }
-});
-
-// PUT /api/admin/tarifas/:id — editar puntos por kg / activar-desactivar
-app.put("/api/admin/tarifas/:id", verificarJWT, soloAdmin, async (req, res) => {
-  try {
-    const { material, puntos_por_kg, activo } = req.body;
-    const actualizada = await TarifaMaterial.findByIdAndUpdate(
-      req.params.id, { material, puntos_por_kg, activo }, { new: true }
-    );
-    if (!actualizada) return res.status(404).json({ mensaje: "Tarifa no encontrada" });
-    res.json({ mensaje: "Tarifa actualizada", tarifa: actualizada });
-  } catch {
-    res.status(500).json({ mensaje: "Error al actualizar tarifa" });
-  }
-});
-
-// DELETE /api/admin/tarifas/:id — eliminar tarifa (el material vuelve al valor por defecto)
-app.delete("/api/admin/tarifas/:id", verificarJWT, soloAdmin, async (req, res) => {
-  try {
-    await TarifaMaterial.findByIdAndDelete(req.params.id);
-    res.json({ mensaje: "Tarifa eliminada" });
-  } catch {
-    res.status(500).json({ mensaje: "Error al eliminar tarifa" });
-  }
-});
-
-// ══════════════════ CRUD: USUARIOS (crear / editar / eliminar) ══════════════════
-
-// POST /api/admin/usuarios — crear usuario directamente desde el panel admin
-app.post("/api/admin/usuarios", verificarJWT, soloAdmin, async (req, res) => {
-  try {
-    const { nombre, correo, password, region, rol } = req.body;
-    if (!nombre || !correo || !password)
-      return res.status(400).json({ mensaje: "Nombre, correo y contraseña son obligatorios" });
-    if (await Usuario.findOne({ correo }))
-      return res.status(400).json({ mensaje: "El correo ya está registrado" });
-    const hash  = await bcrypt.hash(password, 12);
-    const nuevo = await new Usuario({ nombre, correo, password: hash, region: region || "—", rol: rol || "ciudadano" }).save();
-    res.json({ mensaje: "Usuario creado", usuario: { ...nuevo.toObject(), password: undefined } });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ mensaje: "Error al crear usuario" });
-  }
-});
-
-// PUT /api/admin/usuarios/:id — editar datos completos del usuario
-app.put("/api/admin/usuarios/:id", verificarJWT, soloAdmin, async (req, res) => {
-  try {
-    const { nombre, correo, region, rol } = req.body;
-    if (correo) {
-      const existente = await Usuario.findOne({ correo, _id: { $ne: req.params.id } });
-      if (existente) return res.status(400).json({ mensaje: "Ese correo ya lo usa otro usuario" });
-    }
-    const actualizado = await Usuario.findByIdAndUpdate(
-      req.params.id, { nombre, correo, region, rol }, { new: true }
-    ).select("-password");
-    if (!actualizado) return res.status(404).json({ mensaje: "Usuario no encontrado" });
-    res.json({ mensaje: "Usuario actualizado", usuario: actualizado });
-  } catch {
-    res.status(500).json({ mensaje: "Error al actualizar usuario" });
-  }
-});
-
-// DELETE /api/admin/usuarios/:id — eliminar usuario definitivamente
-app.delete("/api/admin/usuarios/:id", verificarJWT, soloAdmin, async (req, res) => {
-  try {
-    if (req.params.id === req.user.id)
-      return res.status(400).json({ mensaje: "No puedes eliminar tu propia cuenta" });
-    await Usuario.findByIdAndDelete(req.params.id);
-    res.json({ mensaje: "Usuario eliminado" });
-  } catch {
-    res.status(500).json({ mensaje: "Error al eliminar usuario" });
   }
 });
