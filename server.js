@@ -510,3 +510,29 @@ app.get("/api/admin/canjes", verificarJWT, soloAdmin, async (req, res) => {
     res.status(500).json({ mensaje: "Error al obtener canjes" });
   }
 });
+// Tarifa de puntos por Kg segun el material (el aluminio no vale lo mismo
+// que el vidrio). Si un material no tiene tarifa cargada, se usa un valor
+// por defecto para que el registro nunca falle.
+const TarifaMaterial = mongoose.model("TarifaMaterial", new mongoose.Schema({
+  material:       { type: String, required: true, unique: true },
+  puntos_por_kg:  { type: Number, required: true },
+  activo:         { type: Boolean, default: true }
+}));
+
+const PUNTOS_POR_DEFECTO = 5;
+// Siembra tarifas base la primera vez que corre el servidor, para que la
+// tabla no aparezca vacia en la demo.
+async function sembrarTarifas() {
+  const existentes = await TarifaMaterial.countDocuments();
+  if (existentes > 0) return;
+  await TarifaMaterial.insertMany([
+    { material: "Aluminio",     puntos_por_kg: 15 },
+    { material: "Metal",        puntos_por_kg: 12 },
+    { material: "Plástico",     puntos_por_kg: 8  },
+    { material: "Vidrio",       puntos_por_kg: 5  },
+    { material: "Papel",        puntos_por_kg: 4  },
+    { material: "Cartón",       puntos_por_kg: 4  }
+  ]);
+  console.log("Tarifas de materiales sembradas por defecto");
+}
+sembrarTarifas().catch(err => console.log("Error sembrando tarifas:", err));
