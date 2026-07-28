@@ -7,6 +7,25 @@ const path     = require("path");
 const axios    = require("axios");
 require("dotenv").config();
 
+// ── Catálogo único de materiales permitidos y su tarifa (pts/kg) ──
+const MATERIALES_PERMITIDOS = {
+  "Plástico":     5,
+  "Vidrio":       3,
+  "Papel":        4,
+  "Cartón":       4,
+  "Metal":        8,
+  "Electrónicos": 20
+};
+
+function materialValido(tipo) {
+  return typeof tipo === "string" && Object.prototype.hasOwnProperty.call(MATERIALES_PERMITIDOS, tipo);
+}
+
+function calcularPuntos(tipo_material, cantidad) {
+  const tarifa = MATERIALES_PERMITIDOS[tipo_material];
+  return Math.round(tarifa * cantidad * 10) / 10;
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -22,7 +41,8 @@ const Usuario = mongoose.model("Usuario", new mongoose.Schema({
   correo:         { type: String, required: true, unique: true },
   password:       { type: String, required: true },
   region:         { type: String, required: true },
-  rol:            { type: String, default: "ciudadano" },
+  rol:            { type: String, enum: ["ciudadano", "trabajador", "administrador", "admin"], default: "ciudadano" },
+  punto_asignado: { type: mongoose.Schema.Types.ObjectId, ref: "PuntoLimpio", default: null },
   puntos_totales: { type: Number, default: 0 },
   fecha_registro: { type: Date,   default: Date.now },
   activo:         { type: Boolean, default: true }
@@ -34,8 +54,16 @@ const PuntoLimpio = mongoose.model("PuntoLimpio", new mongoose.Schema({
   lat:          Number,
   lng:          Number,
   codigo_qr:    { type: String, unique: true },
-  materiales:   [String],
+  materiales:   [{ type: String, enum: Object.keys(MATERIALES_PERMITIDOS) }],
   activo:       { type: Boolean, default: true }
+}));
+
+const Empresa = mongoose.model("Empresa", new mongoose.Schema({
+  nombre:         { type: String, required: true },
+  rubro:          String,
+  contacto_email: String,
+  activo:         { type: Boolean, default: true },
+  fecha_registro: { type: Date, default: Date.now }
 }));
 
 const Beneficio = mongoose.model("Beneficio", new mongoose.Schema({
@@ -43,17 +71,20 @@ const Beneficio = mongoose.model("Beneficio", new mongoose.Schema({
   descripcion:       String,
   puntos_requeridos: { type: Number, required: true },
   stock:             { type: Number, default: 0 },
-  activo:            { type: Boolean, default: true }
+  activo:            { type: Boolean, default: true },
+  id_empresa:        { type: mongoose.Schema.Types.ObjectId, ref: "Empresa", default: null }
 }));
 
 const Historial = mongoose.model("Historial", new mongoose.Schema({
   id_usuario:     { type: mongoose.Schema.Types.ObjectId, ref: "Usuario" },
   id_punto:       { type: mongoose.Schema.Types.ObjectId, ref: "PuntoLimpio" },
   nombre_punto:   String,
-  tipo_material:  String,
-  cantidad:       Number,
+  tipo_material:  { type: String, enum: Object.keys(MATERIALES_PERMITIDOS), required: true },
+  cantidad:       { type: Number, required: true, min: 0.1 },
   puntos_ganados: Number,
   observaciones:  String,
+  estado:         { type: String, enum: ["pendiente", "aprobado", "rechazado"], default: "pendiente" },
+  id_trabajador:  { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", default: null },
   fecha_actividad:{ type: Date, default: Date.now }
 }));
 
@@ -204,7 +235,7 @@ app.get("/api/puntos-limpios", verificarJWT, async (req, res) => {
 // ── GET /api/beneficios ────────────────────────────────────
 app.get("/api/beneficios", verificarJWT, async (req, res) => {
   try {
-    const beneficios = await Beneficio.find({ activo: true, stock: { $gt: 0 } });
+    const beneficios = await Beneficio.find({ activo: true, stock: { $gt: 0 } }).populate("id_empresa", "nombre");
     res.json(beneficios);
   } catch {
     res.status(500).json({ mensaje: "Error al obtener beneficios" });
@@ -224,24 +255,158 @@ app.get("/api/historial", verificarJWT, async (req, res) => {
   }
 });
 
+// PUT /api/historial/:id — el propio ciudadano edita su registro, solo mientras siga pendiente
+app.put("/api/historial/:id", verificarJWT, async (req, res) => {
+  try {
+    const registro = await Historial.findOne({ _id: req.params.id, id_usuario: req.user.id });
+    if (!registro) return res.status(404).json({ mensaje: "Registro no encontrado" });
+    if (registro.estado !== "pendiente")
+      return res.status(400).json({ mensaje: "Este registro ya fue validado y no se puede editar" });
+
+    const { tipo_material, cantidad, observaciones } = req.body;
+    if (!materialValido(tipo_material))
+      return res.status(400).json({ mensaje: "Material no permitido" });
+    const kilos = Number(cantidad);
+    if (!Number.isFinite(kilos) || kilos <= 0)
+      return res.status(400).json({ mensaje: "Cantidad de kilos invalida" });
+
+    registro.tipo_material  = tipo_material;
+    registro.cantidad       = kilos;
+    registro.observaciones  = observaciones;
+    registro.puntos_ganados = calcularPuntos(tipo_material, kilos);
+    await registro.save();
+
+    res.json({ mensaje: "Registro actualizado", registro });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al actualizar registro" });
+  }
+});
+
 // ── POST /api/reciclaje/qr ─────────────────────────────────
+// El ciudadano registra su reciclaje, pero queda PENDIENTE hasta que
+// el trabajador del punto limpio lo confirme (ver /api/trabajador/*)
 app.post("/api/reciclaje/qr", verificarJWT, async (req, res) => {
   try {
     const { tipo_material, cantidad, id_punto, codigo_qr, observaciones } = req.body;
+
+    if (!materialValido(tipo_material))
+      return res.status(400).json({ mensaje: "Material no permitido" });
+
+    const kilos = Number(cantidad);
+    if (!Number.isFinite(kilos) || kilos <= 0)
+      return res.status(400).json({ mensaje: "Cantidad de kilos invalida" });
+
     const punto = await PuntoLimpio.findOne({ _id: id_punto, codigo_qr, activo: true });
     if (!punto) return res.status(404).json({ mensaje: "QR o punto limpio invalido" });
-    const puntos_ganados = Math.max(5, Math.round((cantidad || 1) * 5));
-    await new Historial({
+    if (!punto.materiales.includes(tipo_material))
+      return res.status(400).json({ mensaje: "Este punto limpio no recibe ese material" });
+
+    const puntos_ganados = calcularPuntos(tipo_material, kilos);
+
+    const registro = await new Historial({
       id_usuario:   req.user.id,
       id_punto:     punto._id,
       nombre_punto: punto.nombre_punto,
-      tipo_material, cantidad, puntos_ganados, observaciones
+      tipo_material, cantidad: kilos, puntos_ganados, observaciones,
+      estado: "pendiente"
     }).save();
-    await Usuario.findByIdAndUpdate(req.user.id, { $inc: { puntos_totales: puntos_ganados } });
-    res.json({ mensaje: "Reciclaje registrado", puntos_ganados });
+
+    res.json({ mensaje: "Reciclaje registrado, pendiente de validacion en el punto limpio", registro, puntos_ganados });
   } catch (err) {
     console.log(err);
-    res.status(500).json({ mensaje: "Error al registrar_reciclaje" });
+    res.status(500).json({ mensaje: "Error al registrar reciclaje" });
+  }
+});
+
+// ══════════════════ TRABAJADOR: validación en el punto limpio ══════════════════
+
+// GET /api/trabajador/pendientes — reciclajes pendientes del punto asignado
+app.get("/api/trabajador/pendientes", verificarJWT, soloTrabajador, async (req, res) => {
+  try {
+    const filtro = { estado: "pendiente" };
+    if (req.user.rol === "trabajador") {
+      const yo = await Usuario.findById(req.user.id);
+      if (!yo.punto_asignado) return res.status(400).json({ mensaje: "No tienes un punto limpio asignado" });
+      filtro.id_punto = yo.punto_asignado;
+    }
+    const pendientes = await Historial.find(filtro)
+      .populate("id_usuario", "nombre correo")
+      .sort({ fecha_actividad: 1 });
+    res.json(pendientes);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al obtener pendientes" });
+  }
+});
+
+// GET /api/trabajador/historial — historial ya procesado (aprobado/rechazado) del punto asignado
+app.get("/api/trabajador/historial", verificarJWT, soloTrabajador, async (req, res) => {
+  try {
+    const filtro = { estado: { $in: ["aprobado", "rechazado"] } };
+    if (req.user.rol === "trabajador") {
+      const yo = await Usuario.findById(req.user.id);
+      if (!yo.punto_asignado) return res.status(400).json({ mensaje: "No tienes un punto limpio asignado" });
+      filtro.id_punto = yo.punto_asignado;
+    }
+    const historial = await Historial.find(filtro)
+      .populate("id_usuario", "nombre correo")
+      .sort({ fecha_actividad: -1 })
+      .limit(50);
+    res.json(historial);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al obtener historial" });
+  }
+});
+
+// PUT /api/trabajador/historial/:id/aprobar — confirma el reciclaje; recien aqui se acreditan los puntos
+app.put("/api/trabajador/historial/:id/aprobar", verificarJWT, soloTrabajador, async (req, res) => {
+  try {
+    const registro = await Historial.findById(req.params.id);
+    if (!registro) return res.status(404).json({ mensaje: "Registro no encontrado" });
+    if (registro.estado !== "pendiente")
+      return res.status(400).json({ mensaje: "Este registro ya fue procesado" });
+
+    if (req.user.rol === "trabajador") {
+      const yo = await Usuario.findById(req.user.id);
+      if (!yo.punto_asignado || String(yo.punto_asignado) !== String(registro.id_punto))
+        return res.status(403).json({ mensaje: "No estas asignado a este punto limpio" });
+    }
+
+    registro.estado = "aprobado";
+    registro.id_trabajador = req.user.id;
+    await registro.save();
+    await Usuario.findByIdAndUpdate(registro.id_usuario, { $inc: { puntos_totales: registro.puntos_ganados } });
+
+    res.json({ mensaje: "Reciclaje aprobado", registro });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al aprobar reciclaje" });
+  }
+});
+
+// PUT /api/trabajador/historial/:id/rechazar — descarta el registro, no se acreditan puntos
+app.put("/api/trabajador/historial/:id/rechazar", verificarJWT, soloTrabajador, async (req, res) => {
+  try {
+    const registro = await Historial.findById(req.params.id);
+    if (!registro) return res.status(404).json({ mensaje: "Registro no encontrado" });
+    if (registro.estado !== "pendiente")
+      return res.status(400).json({ mensaje: "Este registro ya fue procesado" });
+
+    if (req.user.rol === "trabajador") {
+      const yo = await Usuario.findById(req.user.id);
+      if (!yo.punto_asignado || String(yo.punto_asignado) !== String(registro.id_punto))
+        return res.status(403).json({ mensaje: "No estas asignado a este punto limpio" });
+    }
+
+    registro.estado = "rechazado";
+    registro.id_trabajador = req.user.id;
+    await registro.save();
+    res.json({ mensaje: "Reciclaje rechazado", registro });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al rechazar reciclaje" });
   }
 });
 
@@ -277,7 +442,7 @@ app.listen(process.env.PORT || 3000, () => {
 // GET /api/admin/usuarios — listar todos los usuarios
 app.get("/api/admin/usuarios", verificarJWT, async (req, res) => {
   try {
-    if (req.user.rol === "ciudadano")
+    if (req.user.rol !== "administrador" && req.user.rol !== "admin")
       return res.status(403).json({ mensaje: "Sin permisos" });
     const usuarios = await Usuario.find().select("-password").sort({ fecha_registro: -1 });
     res.json(usuarios);
@@ -286,10 +451,29 @@ app.get("/api/admin/usuarios", verificarJWT, async (req, res) => {
   }
 });
 
+// PUT /api/admin/usuarios/:id — editar datos del usuario (nombre, correo, region, rol, punto asignado)
+app.put("/api/admin/usuarios/:id", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const { nombre, correo, region, rol, punto_asignado } = req.body;
+    if (rol === "trabajador" && !punto_asignado)
+      return res.status(400).json({ mensaje: "Debes asignar un punto limpio al trabajador" });
+    const actualizado = await Usuario.findByIdAndUpdate(
+      req.params.id,
+      { nombre, correo, region, rol, punto_asignado: rol === "trabajador" ? punto_asignado : null },
+      { new: true }
+    ).select("-password");
+    if (!actualizado) return res.status(404).json({ mensaje: "Usuario no encontrado" });
+    res.json({ mensaje: "Usuario actualizado", usuario: actualizado });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al actualizar usuario" });
+  }
+});
+
 // PUT /api/admin/usuarios/:id/estado — activar o bloquear usuario
 app.put("/api/admin/usuarios/:id/estado", verificarJWT, async (req, res) => {
   try {
-    if (req.user.rol === "ciudadano")
+    if (req.user.rol !== "administrador" && req.user.rol !== "admin")
       return res.status(403).json({ mensaje: "Sin permisos" });
     const { activo } = req.body;
     await Usuario.findByIdAndUpdate(req.params.id, { activo });
@@ -302,9 +486,11 @@ app.put("/api/admin/usuarios/:id/estado", verificarJWT, async (req, res) => {
 // POST /api/admin/puntos-limpios — crear punto limpio
 app.post("/api/admin/puntos-limpios", verificarJWT, async (req, res) => {
   try {
-    if (req.user.rol === "ciudadano")
+    if (req.user.rol !== "administrador" && req.user.rol !== "admin")
       return res.status(403).json({ mensaje: "Sin permisos" });
     const { nombre_punto, direccion, lat, lng, codigo_qr, materiales } = req.body;
+    if (materiales?.some(m => !materialValido(m)))
+      return res.status(400).json({ mensaje: "Uno o mas materiales no son validos" });
     const nuevo = new PuntoLimpio({ nombre_punto, direccion, lat, lng, codigo_qr, materiales });
     await nuevo.save();
     res.json({ mensaje: "Punto limpio creado", punto: nuevo });
@@ -316,10 +502,10 @@ app.post("/api/admin/puntos-limpios", verificarJWT, async (req, res) => {
 // POST /api/admin/beneficios — crear beneficio
 app.post("/api/admin/beneficios", verificarJWT, async (req, res) => {
   try {
-    if (req.user.rol === "ciudadano")
+    if (req.user.rol !== "administrador" && req.user.rol !== "admin")
       return res.status(403).json({ mensaje: "Sin permisos" });
-    const { titulo, descripcion, puntos_requeridos, stock } = req.body;
-    const nuevo = new Beneficio({ titulo, descripcion, puntos_requeridos, stock, activo: true });
+    const { titulo, descripcion, puntos_requeridos, stock, id_empresa } = req.body;
+    const nuevo = new Beneficio({ titulo, descripcion, puntos_requeridos, stock, activo: true, id_empresa: id_empresa || null });
     await nuevo.save();
     res.json({ mensaje: "Beneficio creado", beneficio: nuevo });
   } catch {
@@ -329,7 +515,13 @@ app.post("/api/admin/beneficios", verificarJWT, async (req, res) => {
 
 // ── Middleware admin reutilizable ───────────────────────────
 function soloAdmin(req, res, next) {
-  if (req.user.rol === "ciudadano")
+  if (req.user.rol !== "administrador" && req.user.rol !== "admin")
+    return res.status(403).json({ mensaje: "Sin permisos" });
+  next();
+}
+
+function soloTrabajador(req, res, next) {
+  if (req.user.rol !== "trabajador" && req.user.rol !== "administrador" && req.user.rol !== "admin")
     return res.status(403).json({ mensaje: "Sin permisos" });
   next();
 }
@@ -350,6 +542,8 @@ app.get("/api/admin/puntos-limpios", verificarJWT, soloAdmin, async (req, res) =
 app.put("/api/admin/puntos-limpios/:id", verificarJWT, soloAdmin, async (req, res) => {
   try {
     const { nombre_punto, direccion, lat, lng, codigo_qr, materiales } = req.body;
+    if (materiales?.some(m => !materialValido(m)))
+      return res.status(400).json({ mensaje: "Uno o mas materiales no son validos" });
     const actualizado = await PuntoLimpio.findByIdAndUpdate(
       req.params.id,
       { nombre_punto, direccion, lat, lng, codigo_qr, materiales },
@@ -388,7 +582,7 @@ app.delete("/api/admin/puntos-limpios/:id", verificarJWT, soloAdmin, async (req,
 // GET /api/admin/beneficios — listar TODOS (activos, inactivos y sin stock)
 app.get("/api/admin/beneficios", verificarJWT, soloAdmin, async (req, res) => {
   try {
-    const beneficios = await Beneficio.find().sort({ titulo: 1 });
+    const beneficios = await Beneficio.find().populate("id_empresa", "nombre").sort({ titulo: 1 });
     res.json(beneficios);
   } catch {
     res.status(500).json({ mensaje: "Error al obtener beneficios" });
@@ -398,12 +592,12 @@ app.get("/api/admin/beneficios", verificarJWT, soloAdmin, async (req, res) => {
 // PUT /api/admin/beneficios/:id — editar beneficio
 app.put("/api/admin/beneficios/:id", verificarJWT, soloAdmin, async (req, res) => {
   try {
-    const { titulo, descripcion, puntos_requeridos, stock, activo } = req.body;
+    const { titulo, descripcion, puntos_requeridos, stock, activo, id_empresa } = req.body;
     const actualizado = await Beneficio.findByIdAndUpdate(
       req.params.id,
-      { titulo, descripcion, puntos_requeridos, stock, activo },
+      { titulo, descripcion, puntos_requeridos, stock, activo, id_empresa: id_empresa || null },
       { new: true }
-    );
+    ).populate("id_empresa", "nombre");
     if (!actualizado) return res.status(404).json({ mensaje: "Beneficio no encontrado" });
     res.json({ mensaje: "Beneficio actualizado", beneficio: actualizado });
   } catch {
@@ -418,6 +612,56 @@ app.delete("/api/admin/beneficios/:id", verificarJWT, soloAdmin, async (req, res
     res.json({ mensaje: "Beneficio eliminado" });
   } catch {
     res.status(500).json({ mensaje: "Error al eliminar beneficio" });
+  }
+});
+
+// ══════════════════ CRUD: EMPRESAS ══════════════════
+
+// GET /api/admin/empresas — listar todas (activas e inactivas)
+app.get("/api/admin/empresas", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const empresas = await Empresa.find().sort({ nombre: 1 });
+    res.json(empresas);
+  } catch {
+    res.status(500).json({ mensaje: "Error al obtener empresas" });
+  }
+});
+
+// POST /api/admin/empresas — crear empresa
+app.post("/api/admin/empresas", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const { nombre, rubro, contacto_email } = req.body;
+    if (!nombre) return res.status(400).json({ mensaje: "El nombre de la empresa es obligatorio" });
+    const nueva = await new Empresa({ nombre, rubro, contacto_email }).save();
+    res.json({ mensaje: "Empresa creada", empresa: nueva });
+  } catch {
+    res.status(500).json({ mensaje: "Error al crear empresa" });
+  }
+});
+
+// PUT /api/admin/empresas/:id — editar empresa
+app.put("/api/admin/empresas/:id", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const { nombre, rubro, contacto_email, activo } = req.body;
+    const actualizada = await Empresa.findByIdAndUpdate(
+      req.params.id, { nombre, rubro, contacto_email, activo }, { new: true }
+    );
+    if (!actualizada) return res.status(404).json({ mensaje: "Empresa no encontrada" });
+    res.json({ mensaje: "Empresa actualizada", empresa: actualizada });
+  } catch {
+    res.status(500).json({ mensaje: "Error al actualizar empresa" });
+  }
+});
+
+// DELETE /api/admin/empresas/:id — eliminar empresa
+// Si tenia beneficios asociados, quedan con id_empresa = null (no se borran).
+app.delete("/api/admin/empresas/:id", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    await Beneficio.updateMany({ id_empresa: req.params.id }, { id_empresa: null });
+    await Empresa.findByIdAndDelete(req.params.id);
+    res.json({ mensaje: "Empresa eliminada. Sus beneficios quedaron sin empresa asociada." });
+  } catch {
+    res.status(500).json({ mensaje: "Error al eliminar empresa" });
   }
 });
 
@@ -439,6 +683,13 @@ app.get("/api/admin/historial", verificarJWT, soloAdmin, async (req, res) => {
 app.post("/api/admin/historial", verificarJWT, soloAdmin, async (req, res) => {
   try {
     const { id_usuario, id_punto, tipo_material, cantidad, observaciones } = req.body;
+
+    if (!materialValido(tipo_material))
+      return res.status(400).json({ mensaje: "Material no permitido" });
+    const kilos = Number(cantidad);
+    if (!Number.isFinite(kilos) || kilos <= 0)
+      return res.status(400).json({ mensaje: "Cantidad de kilos invalida" });
+
     const usuario = await Usuario.findById(id_usuario);
     if (!usuario) return res.status(404).json({ mensaje: "Usuario no encontrado" });
     let nombre_punto = "Registro manual";
@@ -446,10 +697,11 @@ app.post("/api/admin/historial", verificarJWT, soloAdmin, async (req, res) => {
       const punto = await PuntoLimpio.findById(id_punto);
       if (punto) nombre_punto = punto.nombre_punto;
     }
-    const puntos_ganados = Math.max(5, Math.round((cantidad || 1) * 5));
+    const puntos_ganados = calcularPuntos(tipo_material, kilos);
     const nuevo = await new Historial({
       id_usuario, id_punto: id_punto || undefined, nombre_punto,
-      tipo_material, cantidad, puntos_ganados, observaciones
+      tipo_material, cantidad: kilos, puntos_ganados, observaciones,
+      estado: "aprobado", id_trabajador: req.user.id
     }).save();
     await Usuario.findByIdAndUpdate(id_usuario, { $inc: { puntos_totales: puntos_ganados } });
     res.json({ mensaje: "Reciclaje registrado", historial: nuevo });
@@ -467,16 +719,23 @@ app.put("/api/admin/historial/:id", verificarJWT, soloAdmin, async (req, res) =>
     if (!anterior) return res.status(404).json({ mensaje: "Registro no encontrado" });
 
     const { tipo_material, cantidad, observaciones } = req.body;
-    const nuevos_puntos = Math.max(5, Math.round((cantidad || 1) * 5));
-    const diferencia = nuevos_puntos - anterior.puntos_ganados;
+
+    if (!materialValido(tipo_material))
+      return res.status(400).json({ mensaje: "Material no permitido" });
+    const kilos = Number(cantidad);
+    if (!Number.isFinite(kilos) || kilos <= 0)
+      return res.status(400).json({ mensaje: "Cantidad de kilos invalida" });
+
+    const nuevos_puntos = calcularPuntos(tipo_material, kilos);
+    const diferencia = nuevos_puntos - (anterior.estado === "aprobado" ? anterior.puntos_ganados : 0);
 
     anterior.tipo_material  = tipo_material;
-    anterior.cantidad       = cantidad;
+    anterior.cantidad       = kilos;
     anterior.observaciones  = observaciones;
     anterior.puntos_ganados = nuevos_puntos;
     await anterior.save();
 
-    if (diferencia !== 0) {
+    if (anterior.estado === "aprobado" && diferencia !== 0) {
       await Usuario.findByIdAndUpdate(anterior.id_usuario, { $inc: { puntos_totales: diferencia } });
     }
     res.json({ mensaje: "Reciclaje actualizado", historial: anterior });
@@ -490,7 +749,9 @@ app.delete("/api/admin/historial/:id", verificarJWT, soloAdmin, async (req, res)
   try {
     const registro = await Historial.findById(req.params.id);
     if (!registro) return res.status(404).json({ mensaje: "Registro no encontrado" });
-    await Usuario.findByIdAndUpdate(registro.id_usuario, { $inc: { puntos_totales: -registro.puntos_ganados } });
+    if (registro.estado === "aprobado") {
+      await Usuario.findByIdAndUpdate(registro.id_usuario, { $inc: { puntos_totales: -registro.puntos_ganados } });
+    }
     await Historial.findByIdAndDelete(req.params.id);
     res.json({ mensaje: "Reciclaje eliminado y puntos descontados" });
   } catch {

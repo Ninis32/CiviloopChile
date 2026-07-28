@@ -29,6 +29,8 @@ document.querySelector("form").addEventListener("submit", async (e) => {
       const rol = datos.usuario.rol;
       if (rol === "admin" || rol === "administrador") {
         window.location.href = "admin-dashboard.html";
+      } else if (rol === "trabajador") {
+        window.location.href = "trabajador-dashboard.html";
       } else {
         window.location.href = "dashboard.html";
       }

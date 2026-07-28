@@ -163,20 +163,30 @@
         return
       }
 
-      contenedor.innerHTML = data.slice(0, 5).map(h => `
+      const estadoInfo = {
+        pendiente: { texto: "Pendiente de validación", color: "#E65100", bg: "#fff3e0" },
+        aprobado:  { texto: "Aprobado",                color: "#2E8B57", bg: "#e8f5e9" },
+        rechazado: { texto: "Rechazado",                color: "#c62828", bg: "#fce4ec" }
+      }
+
+      contenedor.innerHTML = data.slice(0, 5).map(h => {
+        const info = estadoInfo[h.estado || "aprobado"]
+        return `
         <div class="beneficio" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div style="flex:1">
             <strong>${h.tipo_material}</strong>
+            <span style="font-size:0.68rem;font-weight:700;color:${info.color};background:${info.bg};padding:1px 8px;border-radius:20px;margin-left:6px">${info.texto}</span>
             <p style="font-size:0.78rem;color:#888;margin:2px 0">${h.nombre_punto || "Punto limpio"}</p>
             <p style="font-size:0.75rem;color:#aaa">${new Date(h.fecha_actividad).toLocaleDateString("es-CL")} · ${h.cantidad || "—"} kg</p>
             ${h.observaciones ? `<p style="font-size:0.75rem;color:#999;margin:2px 0">${h.observaciones}</p>` : ""}
-            <button class="btn-editar" onclick="abrirEditar('${h._id}','${h.tipo_material}',${h.cantidad||0},'${h.observaciones||""}')">
-              ✏️ Editar
-            </button>
+            ${h.estado === "pendiente" ? `
+              <button class="btn-editar" onclick="abrirEditar('${h._id}','${h.tipo_material}',${h.cantidad||0},'${h.observaciones||""}')">
+                ✏️ Editar
+              </button>` : ""}
           </div>
-          <span style="color:#2E8B57;font-weight:700;white-space:nowrap">+${h.puntos_ganados} pts</span>
+          <span style="color:${h.estado==='rechazado'?'#c62828':'#2E8B57'};font-weight:700;white-space:nowrap">${h.estado==='aprobado'?'+':''}${h.puntos_ganados} pts</span>
         </div>
-      `).join("")
+      `}).join("")
 
     } catch (err) {
       document.getElementById("historial").innerHTML = "<p style='color:#888;font-size:0.85rem'>No se pudo cargar el historial.</p>"
@@ -261,6 +271,7 @@
 
   cargarHistorial()
   actualizarPuntos()
+  setInterval(() => { cargarHistorial(); actualizarPuntos() }, 20000)
 </script>
 </body>
 </html>

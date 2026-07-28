@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Trabajador – CiviLoop Chile</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Segoe UI',sans-serif; background:#f1f8e9; display:flex; min-height:100vh; }
+
+  .sidebar{
+    width:240px; background:#1A5C35; color:white;
+    display:flex; flex-direction:column; min-height:100vh;
+    position:fixed; top:0; left:0; z-index:100;
+  }
+  .sidebar-logo{ padding:1.5rem 1rem; border-bottom:1px solid rgba(255,255,255,0.15); text-align:center; }
+  .sidebar-logo h2{ font-size:1.1rem; color:white; }
+  .sidebar-logo span{ color:#a5d6a7; font-size:0.8rem; }
+  .sidebar-logo .emoji{ font-size:2rem; display:block; margin-bottom:4px; }
+
+  .sidebar-admin{ padding:0.75rem 1rem; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:8px; }
+  .sidebar-admin .avatar{ width:36px; height:36px; border-radius:50%; background:#2E8B57; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:1rem; }
+  .sidebar-admin .info{ flex:1; }
+  .sidebar-admin .nombre{ font-size:0.85rem; font-weight:600; }
+  .sidebar-admin .rol{ font-size:0.72rem; color:#a5d6a7; }
+
+  .nav-item{
+    display:block; padding:0.7rem 1.2rem; cursor:pointer;
+    color:rgba(255,255,255,0.8); font-size:0.88rem; text-decoration:none;
+    border-left:3px solid transparent;
+  }
+  .nav-item:hover{ background:rgba(255,255,255,0.08); color:white; }
+  .nav-item.active{ background:rgba(255,255,255,0.12); color:white; border-left-color:#a5d6a7; }
+
+  .sidebar-bottom{ padding:1rem; border-top:1px solid rgba(255,255,255,0.1); margin-top:auto; }
+  .btn-cerrar{ width:100%; padding:0.6rem; background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2); border-radius:8px; cursor:pointer; font-size:0.85rem; }
+  .btn-cerrar:hover{ background:rgba(255,255,255,0.2); }
+
+  .main{ margin-left:240px; flex:1; display:flex; flex-direction:column; }
+  .topbar{ background:white; padding:1rem 1.5rem; border-bottom:1px solid #e0e0e0; display:flex; align-items:center; justify-content:space-between; }
+  .topbar h1{ font-size:1.1rem; color:#1A5C35; font-weight:600; }
+  .content{ padding:1.5rem; flex:1; }
+
+  .stats-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+  .stat-card{ background:white; border-radius:12px; padding:1.2rem; border-left:4px solid #2E8B57; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+  .stat-card.naranja{ border-left-color:#E65100; }
+  .stat-num{ font-size:2rem; font-weight:700; color:#1A5C35; }
+  .stat-card.naranja .stat-num{ color:#E65100; }
+  .stat-label{ font-size:0.8rem; color:#888; margin-top:2px; }
+
+  .card{ background:white; border-radius:12px; padding:1.25rem; box-shadow:0 1px 4px rgba(0,0,0,0.06); margin-bottom:1rem; }
+  .card-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+  .card-header h3{ font-size:1rem; color:#1A5C35; }
+
+  table{ width:100%; border-collapse:collapse; font-size:0.85rem; }
+  th{ text-align:left; padding:0.6rem 0.75rem; background:#f9fff9; color:#1A5C35; font-weight:600; border-bottom:2px solid #e8f5e9; }
+  td{ padding:0.6rem 0.75rem; border-bottom:1px solid #f0f0f0; color:#333; }
+  tr:hover td{ background:#fafff8; }
+
+  .badge{ display:inline-block; padding:2px 8px; border-radius:20px; font-size:0.72rem; font-weight:600; }
+  .badge-verde{ background:#e8f5e9; color:#2E8B57; }
+  .badge-rojo{  background:#fce4ec; color:#c62828; }
+  .badge-naranja{ background:#fff3e0; color:#E65100; }
+
+  .btn-accion{ padding:4px 12px; border-radius:6px; border:none; cursor:pointer; font-size:0.78rem; margin-right:4px; font-weight:600; }
+  .btn-aprobar{ background:#e8f5e9; color:#2E8B57; }
+  .btn-aprobar:hover{ background:#c8e6c9; }
+  .btn-rechazar{ background:#fce4ec; color:#c62828; }
+  .btn-rechazar:hover{ background:#f8bbd0; }
+
+  #toast{ position:fixed; bottom:1.5rem; right:1.5rem; background:#1A5C35; color:white; padding:0.6rem 1.2rem; border-radius:20px; font-size:0.85rem; display:none; z-index:9999; }
+  .vacio{ text-align:center; color:#aaa; padding:1rem; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <span class="emoji">♻️</span>
+    <h2>CiviLoop Chile</h2>
+    <span>Panel del Trabajador</span>
+  </div>
+
+  <div class="sidebar-admin">
+    <div class="avatar" id="avatar-letra">T</div>
+    <div class="info">
+      <div class="nombre" id="trabajador-nombre">Trabajador</div>
+      <div class="rol" id="trabajador-punto">Punto limpio</div>
+    </div>
+  </div>
+
+  <nav style="margin-top:1rem;">
+    <a href="#" class="nav-item active">✅ Validar reciclajes</a>
+  </nav>
+
+  <div class="sidebar-bottom">
+    <button class="btn-cerrar" onclick="cerrarSesion()">🚪 Cerrar sesión</button>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <h1>Validación de reciclaje en el punto limpio</h1>
+  </div>
+
+  <div class="content">
+
+    <div class="stats-grid">
+      <div class="stat-card naranja">
+        <div class="stat-num" id="num-pendientes">0</div>
+        <div class="stat-label">Pendientes por validar</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="num-aprobados">0</div>
+        <div class="stat-label">Aprobados (últimos 50)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>⏳ Pendientes de validación</h3></div>
+      <table>
+        <thead>
+          <tr><th>Usuario</th><th>Material</th><th>Kg</th><th>Puntos a otorgar</th><th>Fecha</th><th>Acciones</th></tr>
+        </thead>
+        <tbody id="tabla-pendientes">
+          <tr><td colspan="6" class="vacio">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>📋 Historial procesado</h3></div>
+      <table>
+        <thead>
+          <tr><th>Usuario</th><th>Material</th><th>Kg</th><th>Puntos</th><th>Estado</th><th>Fecha</th></tr>
+        </thead>
+        <tbody id="tabla-historial">
+          <tr><td colspan="6" class="vacio">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const token   = localStorage.getItem("token")
+const usuario = JSON.parse(localStorage.getItem("usuario") || "null")
+const API     = window.location.port === "5500" ? "https://civiloopchile.onrender.com" : ""
+
+if (!token || !usuario || (usuario.rol !== "trabajador" && usuario.rol !== "administrador")) {
+  window.location.href = "index.html"
+}
+
+document.getElementById("trabajador-nombre").textContent = usuario.nombre || "Trabajador"
+document.getElementById("avatar-letra").textContent      = (usuario.nombre || "T")[0].toUpperCase()
+
+const headers = { "Content-Type": "application/json", "Authorization": "Bearer " + token }
+
+function toast(msg) {
+  const t = document.getElementById("toast")
+  t.textContent = msg
+  t.style.display = "block"
+  setTimeout(() => t.style.display = "none", 2500)
+}
+
+function cerrarSesion() {
+  localStorage.removeItem("token")
+  localStorage.removeItem("usuario")
+  window.location.href = "index.html"
+}
+
+async function cargarPendientes() {
+  try {
+    const res  = await fetch(API + "/api/trabajador/pendientes", { headers })
+    const data = await res.json()
+
+    if (!res.ok) {
+      document.getElementById("tabla-pendientes").innerHTML =
+        `<tr><td colspan="6" class="vacio">${data.mensaje || "Error"}</td></tr>`
+      document.getElementById("num-pendientes").textContent = "0"
+      return
+    }
+
+    document.getElementById("num-pendientes").textContent = data.length
+
+    if (!data.length) {
+      document.getElementById("tabla-pendientes").innerHTML =
+        '<tr><td colspan="6" class="vacio">No hay reciclajes pendientes</td></tr>'
+      return
+    }
+
+    document.getElementById("tabla-pendientes").innerHTML = data.map(h => `
+      <tr>
+        <td>${h.id_usuario?.nombre || "Usuario"}</td>
+        <td>${h.tipo_material}</td>
+        <td>${h.cantidad}</td>
+        <td><strong style="color:#2E8B57">${h.puntos_ganados} pts</strong></td>
+        <td>${new Date(h.fecha_actividad).toLocaleString("es-CL")}</td>
+        <td>
+          <button class="btn-accion btn-aprobar" onclick="aprobar('${h._id}')">✓ Aprobar</button>
+          <button class="btn-accion btn-rechazar" onclick="rechazar('${h._id}')">✗ Rechazar</button>
+        </td>
+      </tr>
+    `).join("")
+  } catch {
+    document.getElementById("tabla-pendientes").innerHTML =
+      '<tr><td colspan="6" class="vacio">Error de conexión</td></tr>'
+  }
+}
+
+async function cargarHistorial() {
+  try {
+    const res  = await fetch(API + "/api/trabajador/historial", { headers })
+    const data = await res.json()
+    if (!res.ok || !data.length) {
+      document.getElementById("tabla-historial").innerHTML =
+        '<tr><td colspan="6" class="vacio">Sin registros procesados aún</td></tr>'
+      document.getElementById("num-aprobados").textContent = "0"
+      return
+    }
+    document.getElementById("num-aprobados").textContent =
+      data.filter(h => h.estado === "aprobado").length
+
+    document.getElementById("tabla-historial").innerHTML = data.map(h => `
+      <tr>
+        <td>${h.id_usuario?.nombre || "Usuario"}</td>
+        <td>${h.tipo_material}</td>
+        <td>${h.cantidad}</td>
+        <td>${h.puntos_ganados} pts</td>
+        <td><span class="badge ${h.estado === 'aprobado' ? 'badge-verde' : 'badge-rojo'}">${h.estado}</span></td>
+        <td>${new Date(h.fecha_actividad).toLocaleDateString("es-CL")}</td>
+      </tr>
+    `).join("")
+  } catch {
+    document.getElementById("tabla-historial").innerHTML =
+      '<tr><td colspan="6" class="vacio">Error de conexión</td></tr>'
+  }
+}
+
+async function aprobar(id) {
+  try {
+    const res  = await fetch(API + "/api/trabajador/historial/" + id + "/aprobar", { method: "PUT", headers })
+    const data = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast("✓ Reciclaje aprobado y puntos acreditados")
+    cargarPendientes()
+    cargarHistorial()
+  } catch { toast("✗ Error de conexión") }
+}
+
+async function rechazar(id) {
+  if (!confirm("¿Rechazar este reciclaje? El usuario no recibirá puntos.")) return
+  try {
+    const res  = await fetch(API + "/api/trabajador/historial/" + id + "/rechazar", { method: "PUT", headers })
+    const data = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast("✓ Reciclaje rechazado")
+    cargarPendientes()
+    cargarHistorial()
+  } catch { toast("✗ Error de conexión") }
+}
+
+cargarPendientes()
+cargarHistorial()
+setInterval(() => { cargarPendientes(); cargarHistorial() }, 30000)
+</script>
+
+</body>
+</html>

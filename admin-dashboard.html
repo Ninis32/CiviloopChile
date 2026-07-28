@@ -223,6 +223,7 @@
   <a href="#" onclick="mostrar('usuarios', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">👥 Usuarios</a>
   <a href="#" onclick="mostrar('puntos', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">📍 Puntos Limpios</a>
   <a href="#" onclick="mostrar('recompensas', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">🎁 Recompensas</a>
+  <a href="#" onclick="mostrar('empresas', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">🏢 Empresas</a>
   <a href="#" onclick="mostrar('retos', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">🏆 Retos</a>
   <a href="#" onclick="mostrar('reportes', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">📋 Reportes</a>
   <a href="#" onclick="mostrar('configuracion', event)" class="nav-item" style="width:100%; text-align:left; padding:8px 12px; border-radius:8px; text-decoration:none; color:#ccc; font-size:0.9rem;">⚙️ Configuración</a>
@@ -366,10 +367,28 @@
         </div>
         <table>
           <thead>
-            <tr><th>Título</th><th>Descripción</th><th>Puntos</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr>
+            <tr><th>Título</th><th>Empresa</th><th>Descripción</th><th>Puntos</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr>
           </thead>
           <tbody id="tabla-recompensas">
-            <tr><td colspan="6" style="text-align:center;color:#aaa">Cargando...</td></tr>
+            <tr><td colspan="7" style="text-align:center;color:#aaa">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── EMPRESAS ── -->
+    <div class="seccion" id="sec-empresas">
+      <div class="card">
+        <div class="card-header">
+          <h3>🏢 Gestión de Empresas</h3>
+          <button class="btn-add" onclick="abrirModalEmpresaNueva()">+ Agregar empresa</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Nombre</th><th>Rubro</th><th>Contacto</th><th>Estado</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="tabla-empresas">
+            <tr><td colspan="5" style="text-align:center;color:#aaa">Cargando...</td></tr>
           </tbody>
         </table>
       </div>
@@ -406,10 +425,10 @@
         </div>
         <table>
           <thead>
-            <tr><th>Usuario</th><th>Material</th><th>Cantidad (Kg)</th><th>Puntos</th><th>Punto Limpio</th><th>Fecha</th><th>Acciones</th></tr>
+            <tr><th>Usuario</th><th>Material</th><th>Cantidad (Kg)</th><th>Puntos</th><th>Estado</th><th>Punto Limpio</th><th>Fecha</th><th>Acciones</th></tr>
           </thead>
           <tbody id="tabla-reportes">
-            <tr><td colspan="7" style="text-align:center;color:#aaa">Cargando...</td></tr>
+            <tr><td colspan="8" style="text-align:center;color:#aaa">Cargando...</td></tr>
           </tbody>
         </table>
       </div>
@@ -493,10 +512,17 @@
     <label>Región</label>
     <input type="text" id="mu-region" placeholder="Región Metropolitana">
     <label>Rol</label>
-    <select id="mu-rol">
+    <select id="mu-rol" onchange="toggleCampoPunto()">
       <option value="ciudadano">Ciudadano</option>
+      <option value="trabajador">Trabajador (punto limpio)</option>
       <option value="administrador">Administrador</option>
     </select>
+    <div id="campo-punto-asignado" style="display:none">
+      <label>Punto limpio asignado</label>
+      <select id="mu-punto">
+        <option value="">Seleccione un punto</option>
+      </select>
+    </div>
     <div class="modal-btns">
       <button class="btn-cancelar" onclick="cerrarModal('modal-usuario')">Cancelar</button>
       <button class="btn-guardar" onclick="guardarUsuario()">Guardar</button>
@@ -518,8 +544,15 @@
     <input type="number" id="mp-lng" placeholder="-70.6693" step="0.0001">
     <label>Código QR</label>
     <input type="text" id="mp-qr" placeholder="QR-00008">
-    <label>Materiales (separados por coma)</label>
-    <input type="text" id="mp-mat" placeholder="Plástico, Vidrio, Papel">
+    <label>Materiales que recibe este punto</label>
+    <div id="mp-mat-checks" style="display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 8px">
+      <label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" value="Plástico"> Plástico</label>
+      <label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" value="Vidrio"> Vidrio</label>
+      <label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" value="Papel"> Papel</label>
+      <label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" value="Cartón"> Cartón</label>
+      <label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" value="Metal"> Metal</label>
+      <label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" value="Electrónicos"> Electrónicos</label>
+    </div>
     <div class="modal-btns">
       <button class="btn-cancelar" onclick="cerrarModal('modal-punto')">Cancelar</button>
       <button class="btn-guardar" onclick="guardarPunto()">Guardar</button>
@@ -534,6 +567,10 @@
     <input type="hidden" id="mr-id" value="">
     <label>Título</label>
     <input type="text" id="mr-titulo" placeholder="Ej: Descuento 20% en Unimarc">
+    <label>Empresa</label>
+    <select id="mr-empresa">
+      <option value="">Sin empresa asociada</option>
+    </select>
     <label>Descripción</label>
     <textarea id="mr-desc" rows="2" placeholder="Descripción del beneficio"></textarea>
     <label>Puntos requeridos</label>
@@ -543,6 +580,24 @@
     <div class="modal-btns">
       <button class="btn-cancelar" onclick="cerrarModal('modal-recompensa')">Cancelar</button>
       <button class="btn-guardar" onclick="guardarRecompensa()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL EMPRESA ── -->
+<div class="modal-overlay" id="modal-empresa">
+  <div class="modal">
+    <h3 id="me-titulo">🏢 Nueva Empresa</h3>
+    <input type="hidden" id="me-id" value="">
+    <label>Nombre</label>
+    <input type="text" id="me-nombre" placeholder="Ej: Unimarc">
+    <label>Rubro</label>
+    <input type="text" id="me-rubro" placeholder="Ej: Supermercado">
+    <label>Correo de contacto</label>
+    <input type="email" id="me-correo" placeholder="contacto@empresa.cl">
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="cerrarModal('modal-empresa')">Cancelar</button>
+      <button class="btn-guardar" onclick="guardarEmpresa()">Guardar</button>
     </div>
   </div>
 </div>
@@ -557,9 +612,18 @@
       <option value="">Selecciona un usuario</option>
     </select>
     <label>Tipo de material</label>
-    <input type="text" id="mrec-material" placeholder="Ej: Plástico">
+    <select id="mrec-material" onchange="actualizarPreviewAdmin()">
+      <option value="">Seleccione</option>
+      <option value="Plástico">Plástico</option>
+      <option value="Vidrio">Vidrio</option>
+      <option value="Papel">Papel</option>
+      <option value="Cartón">Cartón</option>
+      <option value="Metal">Metal</option>
+      <option value="Electrónicos">Electrónicos</option>
+    </select>
     <label>Cantidad (Kg)</label>
-    <input type="number" id="mrec-cantidad" step="0.1" placeholder="2.5">
+    <input type="number" id="mrec-cantidad" step="0.1" placeholder="2.5" min="0.1" oninput="actualizarPreviewAdmin()">
+    <p id="mrec-preview" style="font-size:0.8rem;color:#2E8B57;margin-top:4px"></p>
     <label>Observaciones</label>
     <textarea id="mrec-obs" rows="2" placeholder="Opcional"></textarea>
     <div class="modal-btns">
@@ -613,7 +677,7 @@ document.getElementById("topbar-fecha").textContent =
 const titulos = {
   inicio:"🏠 Inicio", estadisticas:"📊 Estadísticas",
   usuarios:"👥 Usuarios", puntos:"📍 Puntos Limpios",
-  recompensas:"🎁 Recompensas", retos:"🏆 Retos",
+  recompensas:"🎁 Recompensas", empresas:"🏢 Empresas", retos:"🏆 Retos",
   reportes:"📋 Reportes", configuracion:"⚙️ Configuración"
 }
 
@@ -630,6 +694,7 @@ function mostrar(id) {
   if (id === "usuarios")     cargarUsuarios()
   if (id === "puntos")       cargarPuntosAdmin()
   if (id === "recompensas")  cargarRecompensas()
+  if (id === "empresas")     cargarEmpresas()
   if (id === "reportes")     cargarReportes()
 }
 
@@ -770,7 +835,20 @@ async function toggleUsuario(id, activo) {
   } catch { toast("✗ Error al actualizar usuario") }
 }
 
-function editarUsuario(id) {
+function toggleCampoPunto() {
+  const esTrabajador = document.getElementById("mu-rol").value === "trabajador"
+  document.getElementById("campo-punto-asignado").style.display = esTrabajador ? "block" : "none"
+}
+
+async function poblarSelectPuntos(seleccionado) {
+  if (!puntosCache.length) await cargarPuntosAdmin()
+  const select = document.getElementById("mu-punto")
+  select.innerHTML = '<option value="">Seleccione un punto</option>' +
+    puntosCache.map(p => `<option value="${p._id}">${p.nombre_punto}</option>`).join("")
+  if (seleccionado) select.value = seleccionado
+}
+
+async function editarUsuario(id) {
   const u = todosUsuarios.find(x => x._id === id)
   if (!u) return
   document.getElementById("mu-id").value     = u._id
@@ -778,6 +856,8 @@ function editarUsuario(id) {
   document.getElementById("mu-correo").value = u.correo
   document.getElementById("mu-region").value = u.region
   document.getElementById("mu-rol").value    = u.rol
+  await poblarSelectPuntos(u.punto_asignado?._id || u.punto_asignado || "")
+  toggleCampoPunto()
   document.getElementById("modal-usuario").classList.add("show")
 }
 
@@ -787,7 +867,8 @@ async function guardarUsuario() {
     nombre: document.getElementById("mu-nombre").value,
     correo: document.getElementById("mu-correo").value,
     region: document.getElementById("mu-region").value,
-    rol:    document.getElementById("mu-rol").value
+    rol:    document.getElementById("mu-rol").value,
+    punto_asignado: document.getElementById("mu-punto").value || null
   }
   try {
     const res  = await fetch(API + "/api/admin/usuarios/" + id, { method:"PUT", headers, body: JSON.stringify(body) })
@@ -851,7 +932,9 @@ function editarPunto(id) {
   document.getElementById("mp-lat").value    = p.lat
   document.getElementById("mp-lng").value    = p.lng
   document.getElementById("mp-qr").value     = p.codigo_qr
-  document.getElementById("mp-mat").value    = (p.materiales||[]).join(", ")
+  document.querySelectorAll("#mp-mat-checks input").forEach(chk => {
+    chk.checked = (p.materiales || []).includes(chk.value)
+  })
   document.querySelector("#modal-punto h3").textContent = "📍 Editar Punto Limpio"
   abrirModalPunto()
 }
@@ -876,12 +959,13 @@ async function cargarRecompensas() {
     beneficiosCache = Array.isArray(data) ? data : []
     if (!beneficiosCache.length) {
       document.getElementById("tabla-recompensas").innerHTML =
-        '<tr><td colspan="6" style="text-align:center;color:#aaa">No hay recompensas registradas</td></tr>'
+        '<tr><td colspan="7" style="text-align:center;color:#aaa">No hay recompensas registradas</td></tr>'
       return
     }
     document.getElementById("tabla-recompensas").innerHTML = beneficiosCache.map(b => `
       <tr>
         <td>${b.titulo || "—"}</td>
+        <td>${b.id_empresa?.nombre || "—"}</td>
         <td>${b.descripcion || "—"}</td>
         <td><strong style="color:#2E8B57">${b.puntos_requeridos} pts</strong></td>
         <td>${b.stock}</td>
@@ -894,8 +978,19 @@ async function cargarRecompensas() {
     `).join("")
   } catch {
     document.getElementById("tabla-recompensas").innerHTML =
-      '<tr><td colspan="6" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+      '<tr><td colspan="7" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
   }
+}
+
+async function cargarSelectEmpresas(seleccionado) {
+  const select = document.getElementById("mr-empresa")
+  try {
+    const res = await fetch(API + "/api/admin/empresas", { headers })
+    const empresas = await res.json()
+    select.innerHTML = '<option value="">Sin empresa asociada</option>' +
+      empresas.map(e => `<option value="${e._id}">${e.nombre}</option>`).join("")
+    select.value = seleccionado || ""
+  } catch {}
 }
 
 function editarRecompensa(id) {
@@ -907,6 +1002,7 @@ function editarRecompensa(id) {
   document.getElementById("mr-puntos").value = b.puntos_requeridos
   document.getElementById("mr-stock").value  = b.stock
   document.querySelector("#modal-recompensa h3").textContent = "🎁 Editar Recompensa"
+  cargarSelectEmpresas(b.id_empresa?._id || b.id_empresa || "")
   abrirModalRecompensa()
 }
 
@@ -919,6 +1015,90 @@ async function eliminarRecompensa(id) {
   } catch { toast("✗ Error al eliminar") }
 }
 
+// ── EMPRESAS ──────────────────────────────────────────────
+let empresasCache = []
+
+async function cargarEmpresas() {
+  try {
+    const res = await fetch(API + "/api/admin/empresas", { headers })
+    const data = await res.json()
+    empresasCache = Array.isArray(data) ? data : []
+    if (!empresasCache.length) {
+      document.getElementById("tabla-empresas").innerHTML =
+        '<tr><td colspan="5" style="text-align:center;color:#aaa">No hay empresas registradas</td></tr>'
+      return
+    }
+    document.getElementById("tabla-empresas").innerHTML = empresasCache.map(e => `
+      <tr>
+        <td>${e.nombre}</td>
+        <td>${e.rubro || "—"}</td>
+        <td>${e.contacto_email || "—"}</td>
+        <td><span class="badge ${e.activo?'badge-verde':'badge-rojo'}">${e.activo?'Activo':'Inactivo'}</span></td>
+        <td>
+          <button class="btn-accion btn-editar" onclick="editarEmpresa('${e._id}')">Editar</button>
+          <button class="btn-accion btn-eliminar" onclick="eliminarEmpresa('${e._id}')">Eliminar</button>
+        </td>
+      </tr>
+    `).join("")
+  } catch {
+    document.getElementById("tabla-empresas").innerHTML =
+      '<tr><td colspan="5" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+  }
+}
+
+function abrirModalEmpresaNueva() {
+  document.getElementById("me-id").value     = ""
+  document.getElementById("me-nombre").value = ""
+  document.getElementById("me-rubro").value  = ""
+  document.getElementById("me-correo").value = ""
+  document.getElementById("me-titulo").textContent = "🏢 Nueva Empresa"
+  document.getElementById("modal-empresa").classList.add("show")
+}
+
+function editarEmpresa(id) {
+  const e = empresasCache.find(x => x._id === id)
+  if (!e) return
+  document.getElementById("me-id").value     = e._id
+  document.getElementById("me-nombre").value = e.nombre
+  document.getElementById("me-rubro").value  = e.rubro || ""
+  document.getElementById("me-correo").value = e.contacto_email || ""
+  document.getElementById("me-titulo").textContent = "🏢 Editar Empresa"
+  document.getElementById("modal-empresa").classList.add("show")
+}
+
+async function guardarEmpresa() {
+  const id = document.getElementById("me-id").value
+  const body = {
+    nombre:         document.getElementById("me-nombre").value,
+    rubro:          document.getElementById("me-rubro").value,
+    contacto_email: document.getElementById("me-correo").value,
+    activo: true
+  }
+  if (!body.nombre) { toast("✗ El nombre es obligatorio"); return }
+  try {
+    let res
+    if (id) {
+      res = await fetch(API + "/api/admin/empresas/" + id, { method:"PUT", headers, body: JSON.stringify(body) })
+    } else {
+      res = await fetch(API + "/api/admin/empresas", { method:"POST", headers, body: JSON.stringify(body) })
+    }
+    const data = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast(id ? "✓ Empresa actualizada" : "✓ Empresa creada")
+    cerrarModal("modal-empresa")
+    cargarEmpresas()
+  } catch { toast("✗ Error al guardar") }
+}
+
+async function eliminarEmpresa(id) {
+  if (!confirm("¿Eliminar esta empresa? Sus beneficios quedarán sin empresa asociada, no se eliminan.")) return
+  try {
+    await fetch(API + "/api/admin/empresas/" + id, { method: "DELETE", headers })
+    toast("✓ Empresa eliminada")
+    cargarEmpresas()
+  } catch { toast("✗ Error al eliminar") }
+}
+
 // ── REPORTES / RECICLAJE (CRUD) ────────────────────────────
 async function cargarReportes() {
   try {
@@ -927,7 +1107,7 @@ async function cargarReportes() {
     historialCache = Array.isArray(data) ? data : []
     if (!historialCache.length) {
       document.getElementById("tabla-reportes").innerHTML =
-        '<tr><td colspan="7" style="text-align:center;color:#aaa">No hay reciclajes registrados</td></tr>'
+        '<tr><td colspan="8" style="text-align:center;color:#aaa">No hay reciclajes registrados</td></tr>'
     } else {
       document.getElementById("tabla-reportes").innerHTML = historialCache.map(h => `
         <tr>
@@ -935,6 +1115,7 @@ async function cargarReportes() {
           <td>${h.tipo_material}</td>
           <td>${h.cantidad ?? "—"}</td>
           <td><strong style="color:#2E8B57">${h.puntos_ganados} pts</strong></td>
+          <td><span class="badge ${h.estado==='aprobado'?'badge-verde':h.estado==='rechazado'?'badge-rojo':'badge-azul'}">${h.estado || 'aprobado'}</span></td>
           <td>${h.nombre_punto || "—"}</td>
           <td>${new Date(h.fecha_actividad).toLocaleDateString("es-CL")}</td>
           <td>
@@ -946,7 +1127,7 @@ async function cargarReportes() {
     }
   } catch {
     document.getElementById("tabla-reportes").innerHTML =
-      '<tr><td colspan="7" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+      '<tr><td colspan="8" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
   }
 
   try {
@@ -972,6 +1153,14 @@ async function cargarReportes() {
   }
 }
 
+const TARIFAS = { "Plástico":5, "Vidrio":3, "Papel":4, "Cartón":4, "Metal":8, "Electrónicos":20 }
+function actualizarPreviewAdmin() {
+  const mat = document.getElementById("mrec-material").value
+  const kg  = parseFloat(document.getElementById("mrec-cantidad").value) || 0
+  document.getElementById("mrec-preview").textContent =
+    (mat && kg > 0) ? `≈ ${Math.round(TARIFAS[mat]*kg*10)/10} puntos` : ""
+}
+
 let historialCache = []
 
 function editarReciclaje(id) {
@@ -983,6 +1172,7 @@ function editarReciclaje(id) {
   document.getElementById("mrec-cantidad").value = h.cantidad
   document.getElementById("mrec-obs").value      = h.observaciones || ""
   document.getElementById("mrec-usuario").disabled = true
+  actualizarPreviewAdmin()
   document.querySelector("#modal-reciclaje h3").textContent = "♻️ Editar Reciclaje"
   abrirModalReciclaje()
 }
@@ -1019,7 +1209,11 @@ async function guardarReciclaje() {
 
 // ── MODALES ───────────────────────────────────────────────
 function abrirModalPunto()      { document.getElementById("modal-punto").classList.add("show") }
-function abrirModalRecompensa() { document.getElementById("modal-recompensa").classList.add("show") }
+function abrirModalRecompensa() {
+  document.querySelector("#modal-recompensa h3").textContent = "🎁 Nueva Recompensa"
+  if (!document.getElementById("mr-id").value) cargarSelectEmpresas("")
+  document.getElementById("modal-recompensa").classList.add("show")
+}
 function abrirModalReto()       { document.getElementById("modal-reto").classList.add("show") }
 
 async function abrirModalReciclaje() {
@@ -1045,7 +1239,12 @@ function cerrarModal(id) {
   if (id === "modal-punto") {
     document.getElementById("mp-id").value = ""
     document.querySelector("#modal-punto h3").textContent = "📍 Nuevo Punto Limpio"
-    document.querySelectorAll("#modal-punto input").forEach(i => i.value = "")
+    document.querySelectorAll("#modal-punto input[type=text], #modal-punto input[type=number]").forEach(i => i.value = "")
+    document.querySelectorAll("#mp-mat-checks input").forEach(c => c.checked = false)
+  }
+  if (id === "modal-empresa") {
+    document.getElementById("me-id").value = ""
+    document.querySelectorAll("#modal-empresa input").forEach(i => i.value = "")
   }
   if (id === "modal-recompensa") {
     document.getElementById("mr-id").value = ""
@@ -1068,7 +1267,7 @@ async function guardarPunto() {
     lat:          parseFloat(document.getElementById("mp-lat").value),
     lng:          parseFloat(document.getElementById("mp-lng").value),
     codigo_qr:    document.getElementById("mp-qr").value,
-    materiales:   document.getElementById("mp-mat").value.split(",").map(m=>m.trim())
+    materiales:   Array.from(document.querySelectorAll("#mp-mat-checks input:checked")).map(c => c.value)
   }
   try {
     if (id) {
@@ -1087,6 +1286,7 @@ async function guardarRecompensa() {
   const id = document.getElementById("mr-id").value
   const body = {
     titulo:            document.getElementById("mr-titulo").value,
+    id_empresa:        document.getElementById("mr-empresa").value || null,
     descripcion:       document.getElementById("mr-desc").value,
     puntos_requeridos: parseInt(document.getElementById("mr-puntos").value),
     stock:             parseInt(document.getElementById("mr-stock").value),

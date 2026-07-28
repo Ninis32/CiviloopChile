@@ -26,6 +26,8 @@
       <option value="Metal">Metal</option>
     </select>
 
+    <p id="preview-puntos" style="color:#2E8B57;font-size:0.85rem;margin:6px 0 0"></p>
+
     <label>Cantidad (Kg)</label>
     <input type="number" id="cantidad" placeholder="Ej: 2" min="0.1" step="0.1" required>
 
@@ -64,6 +66,18 @@
   const token   = localStorage.getItem("token")
   const usuario = JSON.parse(localStorage.getItem("usuario") || "null")
   if (!token || !usuario) window.location.href = "index.html"
+
+  const TARIFAS = { "Plástico":5, "Vidrio":3, "Papel":4, "Cartón":4, "Metal":8 }
+  function actualizarPreview() {
+    const mat = document.getElementById("tipo_material").value
+    const kg  = parseFloat(document.getElementById("cantidad").value) || 0
+    const el  = document.getElementById("preview-puntos")
+    el.textContent = (mat && kg > 0)
+      ? `≈ ${Math.round(TARIFAS[mat]*kg*10)/10} puntos (sujeto a validación en el punto limpio)`
+      : ""
+  }
+  document.getElementById("tipo_material").addEventListener("change", actualizarPreview)
+  document.getElementById("cantidad").addEventListener("input", actualizarPreview)
 
   // Cargar puntos limpios desde MongoDB
   async function cargarPuntos() {
@@ -125,14 +139,12 @@
       const data = await res.json()
 
       if (res.ok) {
-        // Mostrar puntos ganados
+        // El registro queda pendiente hasta que el trabajador del punto lo valide
         document.getElementById("form-reciclaje").style.display = "none"
         document.getElementById("resultado").style.display      = "block"
-        document.getElementById("puntos-ganados").textContent   = "+" + data.puntos_ganados + " puntos"
-
-        // Actualizar puntos en localStorage
-        usuario.puntos_totales += data.puntos_ganados
-        localStorage.setItem("usuario", JSON.stringify(usuario))
+        document.getElementById("puntos-ganados").textContent   =
+          "Registrado: " + data.puntos_ganados + " pts pendientes de validación"
+        // No se suman los puntos aun: se acreditan cuando el trabajador aprueba en el punto limpio
       } else {
         alert("Error: " + data.mensaje)
         btn.textContent = "Registrar_Reciclaje"
