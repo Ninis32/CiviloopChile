@@ -248,17 +248,31 @@ app.get("/api/historial", verificarJWT, async (req, res) => {
 app.post("/api/reciclaje/qr", verificarJWT, async (req, res) => {
   try {
     const { tipo_material, cantidad, id_punto, codigo_qr, observaciones } = req.body;
+
+    if (!materialValido(tipo_material))
+      return res.status(400).json({ mensaje: "Material no permitido" });
+
+    const kilos = Number(cantidad);
+    if (!Number.isFinite(kilos) || kilos <= 0)
+      return res.status(400).json({ mensaje: "Cantidad de kilos invalida" });
+
     const punto = await PuntoLimpio.findOne({ _id: id_punto, codigo_qr, activo: true });
     if (!punto) return res.status(404).json({ mensaje: "QR o punto limpio invalido" });
-    const puntos_ganados = Math.max(5, Math.round((cantidad || 1) * 5));
-    await new Historial({
+    if (!punto.materiales.includes(tipo_material))
+      return res.status(400).json({ mensaje: "Este punto limpio no recibe ese material" });
+
+    const puntos_ganados = calcularPuntos(tipo_material, kilos);
+
+    const registro = await new Historial({
       id_usuario:   req.user.id,
       id_punto:     punto._id,
       nombre_punto: punto.nombre_punto,
-      tipo_material, cantidad, puntos_ganados, observaciones
+      tipo_material, cantidad: kilos, puntos_ganados, observaciones,
+      estado: "pendiente"
     }).save();
-    await Usuario.findByIdAndUpdate(req.user.id, { $inc: { puntos_totales: puntos_ganados } });
-    res.json({ mensaje: "Reciclaje registrado", puntos_ganados });
+
+    // Los puntos NO se acreditan aqui: se acreditan cuando el trabajador aprueba
+    res.json({ mensaje: "Reciclaje registrado, pendiente de validacion en el punto limpio", registro, puntos_ganados });
   } catch (err) {
     console.log(err);
     res.status(500).json({ mensaje: "Error al registrar_reciclaje" });
@@ -374,6 +388,103 @@ function soloAdmin(req, res, next) {
   next();
 }
 
+function soloTrabajador(req, res, next) {
+  if (req.user.rol !== "trabajador" && req.user.rol !== "admin" && req.user.rol !== "administrador")
+    return res.status(403).json({ mensaje: "Sin permisos" });
+  next();
+}
+
+// ══════════════════ TRABAJADOR: validación en el punto limpio ══════════════════
+
+// GET /api/trabajador/pendientes — reciclajes pendientes del punto asignado
+app.get("/api/trabajador/pendientes", verificarJWT, soloTrabajador, async (req, res) => {
+  try {
+    const filtro = { estado: "pendiente" };
+    if (req.user.rol === "trabajador") {
+      const yo = await Usuario.findById(req.user.id);
+      if (!yo.punto_asignado) return res.status(400).json({ mensaje: "No tienes un punto limpio asignado" });
+      filtro.id_punto = yo.punto_asignado;
+    }
+    const pendientes = await Historial.find(filtro)
+      .populate("id_usuario", "nombre correo")
+      .sort({ fecha_actividad: 1 });
+    res.json(pendientes);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al obtener pendientes" });
+  }
+});
+
+// GET /api/trabajador/historial — historial ya procesado del punto asignado
+app.get("/api/trabajador/historial", verificarJWT, soloTrabajador, async (req, res) => {
+  try {
+    const filtro = { estado: { $in: ["aprobado", "rechazado"] } };
+    if (req.user.rol === "trabajador") {
+      const yo = await Usuario.findById(req.user.id);
+      if (!yo.punto_asignado) return res.status(400).json({ mensaje: "No tienes un punto limpio asignado" });
+      filtro.id_punto = yo.punto_asignado;
+    }
+    const historial = await Historial.find(filtro)
+      .populate("id_usuario", "nombre correo")
+      .sort({ fecha_actividad: -1 })
+      .limit(50);
+    res.json(historial);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al obtener historial" });
+  }
+});
+
+// PUT /api/trabajador/historial/:id/aprobar — confirma el reciclaje; recien aqui se acreditan los puntos
+app.put("/api/trabajador/historial/:id/aprobar", verificarJWT, soloTrabajador, async (req, res) => {
+  try {
+    const registro = await Historial.findById(req.params.id);
+    if (!registro) return res.status(404).json({ mensaje: "Registro no encontrado" });
+    if (registro.estado !== "pendiente")
+      return res.status(400).json({ mensaje: "Este registro ya fue procesado" });
+
+    if (req.user.rol === "trabajador") {
+      const yo = await Usuario.findById(req.user.id);
+      if (!yo.punto_asignado || String(yo.punto_asignado) !== String(registro.id_punto))
+        return res.status(403).json({ mensaje: "No estas asignado a este punto limpio" });
+    }
+
+    registro.estado = "aprobado";
+    registro.id_trabajador = req.user.id;
+    await registro.save();
+    await Usuario.findByIdAndUpdate(registro.id_usuario, { $inc: { puntos_totales: registro.puntos_ganados } });
+
+    res.json({ mensaje: "Reciclaje aprobado", registro });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al aprobar reciclaje" });
+  }
+});
+
+// PUT /api/trabajador/historial/:id/rechazar — descarta el registro, no se acreditan puntos
+app.put("/api/trabajador/historial/:id/rechazar", verificarJWT, soloTrabajador, async (req, res) => {
+  try {
+    const registro = await Historial.findById(req.params.id);
+    if (!registro) return res.status(404).json({ mensaje: "Registro no encontrado" });
+    if (registro.estado !== "pendiente")
+      return res.status(400).json({ mensaje: "Este registro ya fue procesado" });
+
+    if (req.user.rol === "trabajador") {
+      const yo = await Usuario.findById(req.user.id);
+      if (!yo.punto_asignado || String(yo.punto_asignado) !== String(registro.id_punto))
+        return res.status(403).json({ mensaje: "No estas asignado a este punto limpio" });
+    }
+
+    registro.estado = "rechazado";
+    registro.id_trabajador = req.user.id;
+    await registro.save();
+    res.json({ mensaje: "Reciclaje rechazado", registro });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al rechazar reciclaje" });
+  }
+});
+
 // ══════════════════ CRUD: PUNTOS LIMPIOS ══════════════════
 
 // GET /api/admin/puntos-limpios — listar TODOS (activos e inactivos)
@@ -479,6 +590,13 @@ app.get("/api/admin/historial", verificarJWT, soloAdmin, async (req, res) => {
 app.post("/api/admin/historial", verificarJWT, soloAdmin, async (req, res) => {
   try {
     const { id_usuario, id_punto, tipo_material, cantidad, observaciones } = req.body;
+
+    if (!materialValido(tipo_material))
+      return res.status(400).json({ mensaje: "Material no permitido" });
+    const kilos = Number(cantidad);
+    if (!Number.isFinite(kilos) || kilos <= 0)
+      return res.status(400).json({ mensaje: "Cantidad de kilos invalida" });
+
     const usuario = await Usuario.findById(id_usuario);
     if (!usuario) return res.status(404).json({ mensaje: "Usuario no encontrado" });
     let nombre_punto = "Registro manual";
@@ -486,10 +604,11 @@ app.post("/api/admin/historial", verificarJWT, soloAdmin, async (req, res) => {
       const punto = await PuntoLimpio.findById(id_punto);
       if (punto) nombre_punto = punto.nombre_punto;
     }
-    const puntos_ganados = Math.max(5, Math.round((cantidad || 1) * 5));
+    const puntos_ganados = calcularPuntos(tipo_material, kilos);
     const nuevo = await new Historial({
       id_usuario, id_punto: id_punto || undefined, nombre_punto,
-      tipo_material, cantidad, puntos_ganados, observaciones
+      tipo_material, cantidad: kilos, puntos_ganados, observaciones,
+      estado: "aprobado", id_trabajador: req.user.id
     }).save();
     await Usuario.findByIdAndUpdate(id_usuario, { $inc: { puntos_totales: puntos_ganados } });
     res.json({ mensaje: "Reciclaje registrado", historial: nuevo });
@@ -507,16 +626,22 @@ app.put("/api/admin/historial/:id", verificarJWT, soloAdmin, async (req, res) =>
     if (!anterior) return res.status(404).json({ mensaje: "Registro no encontrado" });
 
     const { tipo_material, cantidad, observaciones } = req.body;
-    const nuevos_puntos = Math.max(5, Math.round((cantidad || 1) * 5));
-    const diferencia = nuevos_puntos - anterior.puntos_ganados;
+    if (!materialValido(tipo_material))
+      return res.status(400).json({ mensaje: "Material no permitido" });
+    const kilos = Number(cantidad);
+    if (!Number.isFinite(kilos) || kilos <= 0)
+      return res.status(400).json({ mensaje: "Cantidad de kilos invalida" });
+
+    const nuevos_puntos = calcularPuntos(tipo_material, kilos);
+    const diferencia = nuevos_puntos - (anterior.estado === "aprobado" ? anterior.puntos_ganados : 0);
 
     anterior.tipo_material  = tipo_material;
-    anterior.cantidad       = cantidad;
+    anterior.cantidad       = kilos;
     anterior.observaciones  = observaciones;
     anterior.puntos_ganados = nuevos_puntos;
     await anterior.save();
 
-    if (diferencia !== 0) {
+    if (anterior.estado === "aprobado" && diferencia !== 0) {
       await Usuario.findByIdAndUpdate(anterior.id_usuario, { $inc: { puntos_totales: diferencia } });
     }
     res.json({ mensaje: "Reciclaje actualizado", historial: anterior });
@@ -530,7 +655,9 @@ app.delete("/api/admin/historial/:id", verificarJWT, soloAdmin, async (req, res)
   try {
     const registro = await Historial.findById(req.params.id);
     if (!registro) return res.status(404).json({ mensaje: "Registro no encontrado" });
-    await Usuario.findByIdAndUpdate(registro.id_usuario, { $inc: { puntos_totales: -registro.puntos_ganados } });
+    if (registro.estado === "aprobado") {
+      await Usuario.findByIdAndUpdate(registro.id_usuario, { $inc: { puntos_totales: -registro.puntos_ganados } });
+    }
     await Historial.findByIdAndDelete(req.params.id);
     res.json({ mensaje: "Reciclaje eliminado y puntos descontados" });
   } catch {
@@ -573,13 +700,17 @@ app.post("/api/admin/usuarios", verificarJWT, soloAdmin, async (req, res) => {
 // PUT /api/admin/usuarios/:id — editar datos completos del usuario
 app.put("/api/admin/usuarios/:id", verificarJWT, soloAdmin, async (req, res) => {
   try {
-    const { nombre, correo, region, rol } = req.body;
+    const { nombre, correo, region, rol, punto_asignado } = req.body;
+    if (rol === "trabajador" && !punto_asignado)
+      return res.status(400).json({ mensaje: "Debes asignar un punto limpio al trabajador" });
     if (correo) {
       const existente = await Usuario.findOne({ correo, _id: { $ne: req.params.id } });
       if (existente) return res.status(400).json({ mensaje: "Ese correo ya lo usa otro usuario" });
     }
     const actualizado = await Usuario.findByIdAndUpdate(
-      req.params.id, { nombre, correo, region, rol }, { new: true }
+      req.params.id,
+      { nombre, correo, region, rol, punto_asignado: rol === "trabajador" ? punto_asignado : null },
+      { new: true }
     ).select("-password");
     if (!actualizado) return res.status(404).json({ mensaje: "Usuario no encontrado" });
     res.json({ mensaje: "Usuario actualizado", usuario: actualizado });
