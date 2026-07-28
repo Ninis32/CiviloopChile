@@ -2,6 +2,7 @@ const API = window.location.port === "5500" || window.location.port === "5501"
   ? "https://civiloopchile.onrender.com"
   : "";
 
+// Formulario de Inicio de Sesión Principal
 document.querySelector("form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -27,27 +28,30 @@ document.querySelector("form").addEventListener("submit", async (e) => {
       localStorage.setItem("usuario", JSON.stringify(datos.usuario));
 
       const rol = datos.usuario.rol;
+      
+      // Redirección inteligente según el ROL del usuario
       if (rol === "admin" || rol === "administrador") {
         window.location.href = "admin-dashboard.html";
-      } else if (rol === "trabajador") {
-        window.location.href = "trabajador-dashboard.html";
+      } else if (rol === "trabajador" || rol === "empresa") {
+        window.location.href = "trabajador-dashboard.html"; //  Trabajador/Empresa
       } else {
-        window.location.href = "dashboard.html";
+        window.location.href = "dashboard.html"; // Ciudadano
       }
     } else {
-      alert(datos.mensaje || "Error al iniciar sesion");
+      alert(datos.mensaje || "Error al iniciar sesión");
       btn.textContent = "Entrar";
       btn.disabled    = false;
     }
 
-  } catch {
-    alert("Error de conexion. Verifica que node server.js esta corriendo.");
+  } catch (error) {
+    console.error(error);
+    alert("Error de conexión. Verifica que node server.js esté corriendo.");
     btn.textContent = "Entrar";
     btn.disabled    = false;
   }
 });
 
-// Boton "Entrar como Administrador"
+// Botón secundario "Entrar como Administrador" (opcional)
 const btnAdmin = document.querySelector(".btn-admin");
 if (btnAdmin) {
   btnAdmin.addEventListener("click", async () => {
@@ -55,7 +59,7 @@ if (btnAdmin) {
     const password = document.getElementById("password").value;
 
     if (!correo || !password) {
-      alert("Ingresa tu correo y contrasena primero");
+      alert("Ingresa tu correo y contraseña primero");
       return;
     }
 
@@ -67,23 +71,29 @@ if (btnAdmin) {
       });
 
       const datos = await res.json();
-      console.log("ROL ADMIN:", datos.usuario?.rol); // para verificar
+      console.log("ROL ADMIN:", datos.usuario?.rol);
 
       if (datos.token) {
         const rol = datos.usuario.rol;
-        // Acepta cualquier rol que no sea ciudadano
+        
         if (rol === "ciudadano") {
-          alert("No tienes permisos de administrador");
+          alert("No tienes permisos de administración o gestión");
           return;
         }
+
         localStorage.setItem("token",   datos.token);
         localStorage.setItem("usuario", JSON.stringify(datos.usuario));
-        window.location.href = "admin-login.html";
+
+        if (rol === "trabajador" || rol === "empresa") {
+          window.location.href = "trabajador-dashboard.html";
+        } else {
+          window.location.href = "admin-dashboard.html";
+        }
       } else {
         alert(datos.mensaje || "Credenciales incorrectas");
       }
     } catch {
-      alert("Error de conexion");
+      alert("Error de conexión");
     }
   });
 }

@@ -149,7 +149,9 @@
 <script>
 const token   = localStorage.getItem("token")
 const usuario = JSON.parse(localStorage.getItem("usuario") || "null")
-const API     = window.location.port === "5500" ? "https://civiloopchile.onrender.com" : ""
+const API = (window.location.port === "5500" || window.location.port === "5501")
+  ? "https://civiloopchile.onrender.com"
+  : "";
 
 if (!token || !usuario || (usuario.rol !== "trabajador" && usuario.rol !== "administrador")) {
   window.location.href = "index.html"
