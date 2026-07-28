@@ -46,7 +46,7 @@ const Usuario = mongoose.model("Usuario", new mongoose.Schema({
   activo:         { type: Boolean, default: true }
 }));
 
-const puntoLimpio = mongoose.model("PuntoLimpio", new mongoose.Schema({
+const PuntoLimpio = mongoose.model("PuntoLimpio", new mongoose.Schema({
   nombre_punto: { type: String, required: true },
   direccion:    { type: String, required: true },
   lat:          Number,
@@ -56,7 +56,7 @@ const puntoLimpio = mongoose.model("PuntoLimpio", new mongoose.Schema({
   activo:       { type: Boolean, default: true }
 }));
 
-const beneficio = mongoose.model("Beneficio", new mongoose.Schema({
+const Beneficio = mongoose.model("Beneficio", new mongoose.Schema({
   titulo:            String,
   descripcion:       String,
   puntos_requeridos: { type: Number, required: true },
@@ -64,7 +64,7 @@ const beneficio = mongoose.model("Beneficio", new mongoose.Schema({
   activo:            { type: Boolean, default: true }
 }));
 
-const historials = mongoose.model("Historial", new mongoose.Schema({
+const Historial = mongoose.model("Historial", new mongoose.Schema({
   id_usuario:     { type: mongoose.Schema.Types.ObjectId, ref: "Usuario" },
   id_punto:       { type: mongoose.Schema.Types.ObjectId, ref: "PuntoLimpio" },
   nombre_punto:   String,
@@ -77,7 +77,7 @@ const historials = mongoose.model("Historial", new mongoose.Schema({
   fecha_actividad:{ type: Date, default: Date.now }
 }));
 
-const canje = mongoose.model("Canje", new mongoose.Schema({
+const Canje = mongoose.model("Canje", new mongoose.Schema({
   id_usuario:        { type: mongoose.Schema.Types.ObjectId, ref: "Usuario" },
   id_beneficio:      { type: mongoose.Schema.Types.ObjectId, ref: "Beneficio" },
   puntos_utilizados: Number,
@@ -359,11 +359,15 @@ app.post("/api/admin/puntos-limpios", verificarJWT, async (req, res) => {
     if (req.user.rol === "ciudadano")
       return res.status(403).json({ mensaje: "Sin permisos" });
     const { nombre_punto, direccion, lat, lng, codigo_qr, materiales } = req.body;
+    const invalidos = (materiales || []).filter(m => !materialValido(m));
+    if (invalidos.length)
+      return res.status(400).json({ mensaje: `Material(es) no permitido(s): ${invalidos.join(", ")}. Validos: ${Object.keys(MATERIALES_PERMITIDOS).join(", ")}` });
     const nuevo = new PuntoLimpio({ nombre_punto, direccion, lat, lng, codigo_qr, materiales });
     await nuevo.save();
     res.json({ mensaje: "Punto limpio creado", punto: nuevo });
   } catch (err) {
-    res.status(500).json({ mensaje: "Error al crear punto limpio" });
+    console.log("ERROR crear punto limpio:", err.message);
+    res.status(500).json({ mensaje: "Error al crear punto limpio: " + err.message });
   }
 });
 
@@ -501,15 +505,19 @@ app.get("/api/admin/puntos-limpios", verificarJWT, soloAdmin, async (req, res) =
 app.put("/api/admin/puntos-limpios/:id", verificarJWT, soloAdmin, async (req, res) => {
   try {
     const { nombre_punto, direccion, lat, lng, codigo_qr, materiales } = req.body;
+    const invalidos = (materiales || []).filter(m => !materialValido(m));
+    if (invalidos.length)
+      return res.status(400).json({ mensaje: `Material(es) no permitido(s): ${invalidos.join(", ")}. Validos: ${Object.keys(MATERIALES_PERMITIDOS).join(", ")}` });
     const actualizado = await PuntoLimpio.findByIdAndUpdate(
       req.params.id,
       { nombre_punto, direccion, lat, lng, codigo_qr, materiales },
-      { new: true }
+      { new: true, runValidators: true }
     );
     if (!actualizado) return res.status(404).json({ mensaje: "Punto limpio no encontrado" });
     res.json({ mensaje: "Punto limpio actualizado", punto: actualizado });
-  } catch {
-    res.status(500).json({ mensaje: "Error al actualizar punto limpio" });
+  } catch (err) {
+    console.log("ERROR actualizar punto limpio:", err.message);
+    res.status(500).json({ mensaje: "Error al actualizar punto limpio: " + err.message });
   }
 });
 
