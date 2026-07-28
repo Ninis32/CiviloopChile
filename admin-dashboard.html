@@ -551,7 +551,7 @@
       <label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" value="Papel"> Papel</label>
       <label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" value="Cartón"> Cartón</label>
       <label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" value="Metal"> Metal</label>
-      <label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" value="Electrónicos"> Electrónicos</label>
+      <label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" value="Placas electronicas"> Placas electrónicas</label>
     </div>
     <div class="modal-btns">
       <button class="btn-cancelar" onclick="cerrarModal('modal-punto')">Cancelar</button>
@@ -898,6 +898,12 @@ async function cargarPuntosAdmin() {
   try {
     const res = await fetch(API + "/api/admin/puntos-limpios", { headers })
     const data = await res.json()
+    if (!res.ok) {
+      document.getElementById("tabla-puntos").innerHTML =
+        `<tr><td colspan="6" style="text-align:center;color:#aaa">${data.mensaje || "Error al cargar"}</td></tr>`
+      puntosCache = []
+      return
+    }
     puntosCache = Array.isArray(data) ? data : []
     if (!puntosCache.length) {
       document.getElementById("tabla-puntos").innerHTML =
@@ -1270,16 +1276,15 @@ async function guardarPunto() {
     materiales:   Array.from(document.querySelectorAll("#mp-mat-checks input:checked")).map(c => c.value)
   }
   try {
-    if (id) {
-      await fetch(API + "/api/admin/puntos-limpios/" + id, { method:"PUT", headers, body: JSON.stringify(body) })
-      toast("✓ Punto limpio actualizado")
-    } else {
-      await fetch(API + "/api/admin/puntos-limpios", { method:"POST", headers, body: JSON.stringify(body) })
-      toast("✓ Punto limpio agregado")
-    }
+    const url    = id ? API + "/api/admin/puntos-limpios/" + id : API + "/api/admin/puntos-limpios"
+    const method = id ? "PUT" : "POST"
+    const res    = await fetch(url, { method, headers, body: JSON.stringify(body) })
+    const data   = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast(id ? "✓ Punto limpio actualizado" : "✓ Punto limpio agregado")
     cerrarModal("modal-punto")
     cargarPuntosAdmin()
-  } catch { toast("✗ Error al guardar") }
+  } catch { toast("✗ Error de conexion al guardar") }
 }
 
 async function guardarRecompensa() {
@@ -1293,16 +1298,15 @@ async function guardarRecompensa() {
     activo:            true
   }
   try {
-    if (id) {
-      await fetch(API + "/api/admin/beneficios/" + id, { method:"PUT", headers, body: JSON.stringify(body) })
-      toast("✓ Recompensa actualizada")
-    } else {
-      await fetch(API + "/api/admin/beneficios", { method:"POST", headers, body: JSON.stringify(body) })
-      toast("✓ Recompensa agregada")
-    }
+    const url    = id ? API + "/api/admin/beneficios/" + id : API + "/api/admin/beneficios"
+    const method = id ? "PUT" : "POST"
+    const res    = await fetch(url, { method, headers, body: JSON.stringify(body) })
+    const data   = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast(id ? "✓ Recompensa actualizada" : "✓ Recompensa agregada")
     cerrarModal("modal-recompensa")
     cargarRecompensas()
-  } catch { toast("✗ Error al guardar") }
+  } catch { toast("✗ Error de conexion al guardar") }
 }
 
 function guardarReto() {
