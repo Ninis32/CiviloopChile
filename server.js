@@ -56,11 +56,27 @@ const PuntoLimpio = mongoose.model("PuntoLimpio", new mongoose.Schema({
   activo:       { type: Boolean, default: true }
 }));
 
+const Empresa = mongoose.model("Empresa", new mongoose.Schema({
+  nombre:         { type: String, required: true },
+  rubro:          String,
+  contacto_email: String,
+  activo:         { type: Boolean, default: true }
+}));
+
+const Reto = mongoose.model("Reto", new mongoose.Schema({
+  nombre:         { type: String, required: true },
+  descripcion:    String,
+  meta_kg:        { type: Number, required: true, min: 0.1 },
+  puntos_premio:  { type: Number, required: true, min: 1 },
+  activo:         { type: Boolean, default: true }
+}));
+
 const Beneficio = mongoose.model("Beneficio", new mongoose.Schema({
   titulo:            String,
   descripcion:       String,
   puntos_requeridos: { type: Number, required: true },
   stock:             { type: Number, default: 0 },
+  id_empresa:        { type: mongoose.Schema.Types.ObjectId, ref: "Empresa", default: null },
   activo:            { type: Boolean, default: true }
 }));
 
@@ -224,7 +240,8 @@ app.get("/api/puntos-limpios", verificarJWT, async (req, res) => {
 // ── GET /api/beneficios ────────────────────────────────────
 app.get("/api/beneficios", verificarJWT, async (req, res) => {
   try {
-    const beneficios = await Beneficio.find({ activo: true, stock: { $gt: 0 } });
+    const beneficios = await Beneficio.find({ activo: true, stock: { $gt: 0 } })
+      .populate("id_empresa", "nombre rubro");
     res.json(beneficios);
   } catch {
     res.status(500).json({ mensaje: "Error al obtener beneficios" });
@@ -376,12 +393,13 @@ app.post("/api/admin/beneficios", verificarJWT, async (req, res) => {
   try {
     if (req.user.rol === "ciudadano")
       return res.status(403).json({ mensaje: "Sin permisos" });
-    const { titulo, descripcion, puntos_requeridos, stock } = req.body;
-    const nuevo = new Beneficio({ titulo, descripcion, puntos_requeridos, stock, activo: true });
+    const { titulo, descripcion, puntos_requeridos, stock, id_empresa } = req.body;
+    const nuevo = new Beneficio({ titulo, descripcion, puntos_requeridos, stock, id_empresa: id_empresa || null, activo: true });
     await nuevo.save();
     res.json({ mensaje: "Beneficio creado", beneficio: nuevo });
-  } catch {
-    res.status(500).json({ mensaje: "Error al crear beneficio" });
+  } catch (err) {
+    console.log("ERROR crear beneficio:", err.message);
+    res.status(500).json({ mensaje: "Error al crear beneficio: " + err.message });
   }
 });
 
@@ -547,26 +565,28 @@ app.delete("/api/admin/puntos-limpios/:id", verificarJWT, soloAdmin, async (req,
 // GET /api/admin/beneficios — listar TODOS (activos, inactivos y sin stock)
 app.get("/api/admin/beneficios", verificarJWT, soloAdmin, async (req, res) => {
   try {
-    const beneficios = await Beneficio.find().sort({ titulo: 1 });
+    const beneficios = await Beneficio.find().populate("id_empresa", "nombre rubro").sort({ titulo: 1 });
     res.json(beneficios);
-  } catch {
-    res.status(500).json({ mensaje: "Error al obtener beneficios" });
+  } catch (err) {
+    console.log("ERROR listar beneficios:", err.message);
+    res.status(500).json({ mensaje: "Error al obtener beneficios: " + err.message });
   }
 });
 
 // PUT /api/admin/beneficios/:id — editar beneficio
 app.put("/api/admin/beneficios/:id", verificarJWT, soloAdmin, async (req, res) => {
   try {
-    const { titulo, descripcion, puntos_requeridos, stock, activo } = req.body;
+    const { titulo, descripcion, puntos_requeridos, stock, id_empresa, activo } = req.body;
     const actualizado = await Beneficio.findByIdAndUpdate(
       req.params.id,
-      { titulo, descripcion, puntos_requeridos, stock, activo },
-      { new: true }
-    );
+      { titulo, descripcion, puntos_requeridos, stock, id_empresa: id_empresa || null, activo },
+      { new: true, runValidators: true }
+    ).populate("id_empresa", "nombre rubro");
     if (!actualizado) return res.status(404).json({ mensaje: "Beneficio no encontrado" });
     res.json({ mensaje: "Beneficio actualizado", beneficio: actualizado });
-  } catch {
-    res.status(500).json({ mensaje: "Error al actualizar beneficio" });
+  } catch (err) {
+    console.log("ERROR actualizar beneficio:", err.message);
+    res.status(500).json({ mensaje: "Error al actualizar beneficio: " + err.message });
   }
 });
 
@@ -577,6 +597,129 @@ app.delete("/api/admin/beneficios/:id", verificarJWT, soloAdmin, async (req, res
     res.json({ mensaje: "Beneficio eliminado" });
   } catch {
     res.status(500).json({ mensaje: "Error al eliminar beneficio" });
+  }
+});
+
+// ══════════════════ CRUD: RETOS ══════════════════
+
+app.get("/api/admin/retos", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const retos = await Reto.find().sort({ nombre: 1 });
+    res.json(retos);
+  } catch (err) {
+    console.log("ERROR listar retos:", err.message);
+    res.status(500).json({ mensaje: "Error al obtener retos: " + err.message });
+  }
+});
+
+app.post("/api/admin/retos", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const { nombre, descripcion, meta_kg, puntos_premio } = req.body;
+    const meta = Number(meta_kg);
+    const premio = Number(puntos_premio);
+    if (!nombre) return res.status(400).json({ mensaje: "El nombre es obligatorio" });
+    if (!Number.isFinite(meta) || meta <= 0) return res.status(400).json({ mensaje: "La meta en Kg debe ser mayor a 0" });
+    if (!Number.isFinite(premio) || premio <= 0) return res.status(400).json({ mensaje: "Los puntos de premio deben ser mayor a 0" });
+    const nuevo = await new Reto({ nombre, descripcion, meta_kg: meta, puntos_premio: premio, activo: true }).save();
+    res.json({ mensaje: "Reto creado", reto: nuevo });
+  } catch (err) {
+    console.log("ERROR crear reto:", err.message);
+    res.status(500).json({ mensaje: "Error al crear reto: " + err.message });
+  }
+});
+
+app.put("/api/admin/retos/:id", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const { nombre, descripcion, meta_kg, puntos_premio } = req.body;
+    const meta = Number(meta_kg);
+    const premio = Number(puntos_premio);
+    if (!nombre) return res.status(400).json({ mensaje: "El nombre es obligatorio" });
+    if (!Number.isFinite(meta) || meta <= 0) return res.status(400).json({ mensaje: "La meta en Kg debe ser mayor a 0" });
+    if (!Number.isFinite(premio) || premio <= 0) return res.status(400).json({ mensaje: "Los puntos de premio deben ser mayor a 0" });
+    const actualizado = await Reto.findByIdAndUpdate(
+      req.params.id,
+      { nombre, descripcion, meta_kg: meta, puntos_premio: premio },
+      { new: true, runValidators: true }
+    );
+    if (!actualizado) return res.status(404).json({ mensaje: "Reto no encontrado" });
+    res.json({ mensaje: "Reto actualizado", reto: actualizado });
+  } catch (err) {
+    console.log("ERROR actualizar reto:", err.message);
+    res.status(500).json({ mensaje: "Error al actualizar reto: " + err.message });
+  }
+});
+
+app.put("/api/admin/retos/:id/estado", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const { activo } = req.body;
+    const actualizado = await Reto.findByIdAndUpdate(req.params.id, { activo }, { new: true });
+    if (!actualizado) return res.status(404).json({ mensaje: "Reto no encontrado" });
+    res.json({ mensaje: "Estado actualizado", reto: actualizado });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al actualizar estado: " + err.message });
+  }
+});
+
+app.delete("/api/admin/retos/:id", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const borrado = await Reto.findByIdAndDelete(req.params.id);
+    if (!borrado) return res.status(404).json({ mensaje: "Reto no encontrado" });
+    res.json({ mensaje: "Reto eliminado" });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al eliminar reto: " + err.message });
+  }
+});
+
+// ══════════════════ CRUD: EMPRESAS ══════════════════
+
+app.get("/api/admin/empresas", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const empresas = await Empresa.find().sort({ nombre: 1 });
+    res.json(empresas);
+  } catch (err) {
+    console.log("ERROR listar empresas:", err.message);
+    res.status(500).json({ mensaje: "Error al obtener empresas: " + err.message });
+  }
+});
+
+app.post("/api/admin/empresas", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const { nombre, rubro, contacto_email } = req.body;
+    if (!nombre) return res.status(400).json({ mensaje: "El nombre es obligatorio" });
+    const nueva = await new Empresa({ nombre, rubro, contacto_email, activo: true }).save();
+    res.json({ mensaje: "Empresa creada", empresa: nueva });
+  } catch (err) {
+    console.log("ERROR crear empresa:", err.message);
+    res.status(500).json({ mensaje: "Error al crear empresa: " + err.message });
+  }
+});
+
+app.put("/api/admin/empresas/:id", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const { nombre, rubro, contacto_email, activo } = req.body;
+    if (!nombre) return res.status(400).json({ mensaje: "El nombre es obligatorio" });
+    const actualizada = await Empresa.findByIdAndUpdate(
+      req.params.id,
+      { nombre, rubro, contacto_email, activo },
+      { new: true, runValidators: true }
+    );
+    if (!actualizada) return res.status(404).json({ mensaje: "Empresa no encontrada" });
+    res.json({ mensaje: "Empresa actualizada", empresa: actualizada });
+  } catch (err) {
+    console.log("ERROR actualizar empresa:", err.message);
+    res.status(500).json({ mensaje: "Error al actualizar empresa: " + err.message });
+  }
+});
+
+app.delete("/api/admin/empresas/:id", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const borrada = await Empresa.findByIdAndDelete(req.params.id);
+    if (!borrada) return res.status(404).json({ mensaje: "Empresa no encontrada" });
+    await Beneficio.updateMany({ id_empresa: req.params.id }, { id_empresa: null });
+    res.json({ mensaje: "Empresa eliminada" });
+  } catch (err) {
+    console.log("ERROR eliminar empresa:", err.message);
+    res.status(500).json({ mensaje: "Error al eliminar empresa: " + err.message });
   }
 });
 
