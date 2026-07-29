@@ -12,8 +12,9 @@
     /* ── Sidebar ── */
     .sidebar{
       width:240px; background:#1A5C35; color:white;
-      display:flex; flex-direction:column; min-height:100vh;
+      display:flex; flex-direction:column; height:100vh;
       position:fixed; top:0; left:0; z-index:100;
+      overflow-y:auto;
     }
     .sidebar-logo{
       padding:1.5rem 1rem; border-bottom:1px solid rgba(255,255,255,0.15);
@@ -54,7 +55,7 @@
       padding:0.75rem 1.2rem 0.25rem; text-transform:uppercase; letter-spacing:1px;
     }
 
-    .sidebar-bottom{ padding:1rem; border-top:1px solid rgba(255,255,255,0.1); }
+    .sidebar-bottom{ padding:1rem; border-top:1px solid rgba(255,255,255,0.1); margin-top:auto; }
     .btn-cerrar{
       width:100%; padding:0.6rem; background:rgba(255,255,255,0.1);
       color:white; border:1px solid rgba(255,255,255,0.2);
@@ -636,7 +637,8 @@
 <!-- ── MODAL RETO ── -->
 <div class="modal-overlay" id="modal-reto">
   <div class="modal">
-    <h3>🏆 Nuevo Reto</h3>
+    <h3 id="reto-titulo">🏆 Nuevo Reto</h3>
+    <input type="hidden" id="reto-id" value="">
     <label>Nombre del reto</label>
     <input type="text" id="reto-nombre" placeholder="Ej: Rey del Reciclaje">
     <label>Descripción</label>
@@ -693,6 +695,7 @@ function mostrar(id) {
   if (id === "estadisticas") cargarEstadisticas()
   if (id === "usuarios")     cargarUsuarios()
   if (id === "puntos")       cargarPuntosAdmin()
+  if (id === "retos")        cargarRetos()
   if (id === "recompensas")  cargarRecompensas()
   if (id === "empresas")     cargarEmpresas()
   if (id === "reportes")     cargarReportes()
@@ -1110,6 +1113,11 @@ async function cargarReportes() {
   try {
     const res = await fetch(API + "/api/admin/historial", { headers })
     const data = await res.json()
+    if (!res.ok) {
+      document.getElementById("tabla-reportes").innerHTML =
+        `<tr><td colspan="8" style="text-align:center;color:#aaa">${data.mensaje || "Error al cargar"}</td></tr>`
+      historialCache = []
+    } else {
     historialCache = Array.isArray(data) ? data : []
     if (!historialCache.length) {
       document.getElementById("tabla-reportes").innerHTML =
@@ -1131,15 +1139,19 @@ async function cargarReportes() {
         </tr>
       `).join("")
     }
+    }
   } catch {
     document.getElementById("tabla-reportes").innerHTML =
-      '<tr><td colspan="8" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+      '<tr><td colspan="8" style="text-align:center;color:#aaa">Error de conexion</td></tr>'
   }
 
   try {
     const res2 = await fetch(API + "/api/admin/canjes", { headers })
     const data2 = await res2.json()
-    if (!Array.isArray(data2) || !data2.length) {
+    if (!res2.ok) {
+      document.getElementById("tabla-reportes-canjes").innerHTML =
+        `<tr><td colspan="5" style="text-align:center;color:#aaa">${data2.mensaje || "Error al cargar"}</td></tr>`
+    } else if (!Array.isArray(data2) || !data2.length) {
       document.getElementById("tabla-reportes-canjes").innerHTML =
         '<tr><td colspan="5" style="text-align:center;color:#aaa">No hay canjes registrados</td></tr>'
     } else {
@@ -1155,7 +1167,7 @@ async function cargarReportes() {
     }
   } catch {
     document.getElementById("tabla-reportes-canjes").innerHTML =
-      '<tr><td colspan="5" style="text-align:center;color:#aaa">Error al cargar</td></tr>'
+      '<tr><td colspan="5" style="text-align:center;color:#aaa">Error de conexion</td></tr>'
   }
 }
 
@@ -1186,10 +1198,12 @@ function editarReciclaje(id) {
 async function eliminarReciclaje(id) {
   if (!confirm("¿Eliminar este registro de reciclaje? Se descontarán los puntos otorgados al usuario.")) return
   try {
-    await fetch(API + "/api/admin/historial/" + id, { method: "DELETE", headers })
+    const res  = await fetch(API + "/api/admin/historial/" + id, { method: "DELETE", headers })
+    const data = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
     toast("✓ Reciclaje eliminado")
     cargarReportes()
-  } catch { toast("✗ Error al eliminar") }
+  } catch { toast("✗ Error de conexion al eliminar") }
 }
 
 async function guardarReciclaje() {
@@ -1201,16 +1215,15 @@ async function guardarReciclaje() {
     observaciones: document.getElementById("mrec-obs").value
   }
   try {
-    if (id) {
-      await fetch(API + "/api/admin/historial/" + id, { method: "PUT", headers, body: JSON.stringify(body) })
-      toast("✓ Reciclaje actualizado")
-    } else {
-      await fetch(API + "/api/admin/historial", { method: "POST", headers, body: JSON.stringify(body) })
-      toast("✓ Reciclaje registrado")
-    }
+    const url    = id ? API + "/api/admin/historial/" + id : API + "/api/admin/historial"
+    const method = id ? "PUT" : "POST"
+    const res    = await fetch(url, { method, headers, body: JSON.stringify(body) })
+    const data   = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast(id ? "✓ Reciclaje actualizado" : "✓ Reciclaje registrado")
     cerrarModal("modal-reciclaje")
     cargarReportes()
-  } catch { toast("✗ Error al guardar") }
+  } catch { toast("✗ Error de conexion al guardar") }
 }
 
 // ── MODALES ───────────────────────────────────────────────
@@ -1220,7 +1233,106 @@ function abrirModalRecompensa() {
   if (!document.getElementById("mr-id").value) cargarSelectEmpresas("")
   document.getElementById("modal-recompensa").classList.add("show")
 }
-function abrirModalReto()       { document.getElementById("modal-reto").classList.add("show") }
+let retosCache = []
+
+async function cargarRetos() {
+  try {
+    const res  = await fetch(API + "/api/admin/retos", { headers })
+    const data = await res.json()
+    if (!res.ok) {
+      document.getElementById("tabla-retos").innerHTML =
+        `<tr><td colspan="6" style="text-align:center;color:#aaa">${data.mensaje || "Error al cargar"}</td></tr>`
+      retosCache = []
+      return
+    }
+    retosCache = Array.isArray(data) ? data : []
+    if (!retosCache.length) {
+      document.getElementById("tabla-retos").innerHTML =
+        '<tr><td colspan="6" style="text-align:center;color:#aaa">No hay retos registrados. Ejemplo: "Recicla 10kg este mes y gana 200 puntos extra"</td></tr>'
+      return
+    }
+    document.getElementById("tabla-retos").innerHTML = retosCache.map(r => `
+      <tr>
+        <td>${r.nombre}</td>
+        <td>${r.descripcion || "—"}</td>
+        <td>${r.meta_kg} kg</td>
+        <td>${r.puntos_premio} pts</td>
+        <td><span class="badge ${r.activo?'badge-verde':'badge-rojo'}">${r.activo?'Activo':'Inactivo'}</span></td>
+        <td>
+          <button class="btn-accion btn-editar" onclick="editarReto('${r._id}')">Editar</button>
+          <button class="btn-accion btn-bloquear" onclick="toggleReto('${r._id}', ${!r.activo})">${r.activo?'Desactivar':'Activar'}</button>
+          <button class="btn-accion btn-eliminar" onclick="eliminarReto('${r._id}')">Eliminar</button>
+        </td>
+      </tr>
+    `).join("")
+  } catch {
+    document.getElementById("tabla-retos").innerHTML =
+      '<tr><td colspan="6" style="text-align:center;color:#aaa">Error de conexion</td></tr>'
+  }
+}
+
+function abrirModalReto() {
+  document.getElementById("reto-id").value    = ""
+  document.getElementById("reto-nombre").value = ""
+  document.getElementById("reto-desc").value   = ""
+  document.getElementById("reto-meta").value   = ""
+  document.getElementById("reto-pts").value    = ""
+  document.getElementById("reto-titulo").textContent = "🏆 Nuevo Reto"
+  document.getElementById("modal-reto").classList.add("show")
+}
+
+function editarReto(id) {
+  const r = retosCache.find(x => x._id === id)
+  if (!r) return
+  document.getElementById("reto-id").value    = r._id
+  document.getElementById("reto-nombre").value = r.nombre
+  document.getElementById("reto-desc").value   = r.descripcion || ""
+  document.getElementById("reto-meta").value   = r.meta_kg
+  document.getElementById("reto-pts").value    = r.puntos_premio
+  document.getElementById("reto-titulo").textContent = "🏆 Editar Reto"
+  document.getElementById("modal-reto").classList.add("show")
+}
+
+async function guardarReto() {
+  const id = document.getElementById("reto-id").value
+  const body = {
+    nombre:        document.getElementById("reto-nombre").value,
+    descripcion:   document.getElementById("reto-desc").value,
+    meta_kg:       parseFloat(document.getElementById("reto-meta").value),
+    puntos_premio: parseInt(document.getElementById("reto-pts").value)
+  }
+  try {
+    const url    = id ? API + "/api/admin/retos/" + id : API + "/api/admin/retos"
+    const method = id ? "PUT" : "POST"
+    const res    = await fetch(url, { method, headers, body: JSON.stringify(body) })
+    const data   = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast(id ? "✓ Reto actualizado" : "✓ Reto creado")
+    cerrarModal("modal-reto")
+    cargarRetos()
+  } catch { toast("✗ Error de conexion al guardar") }
+}
+
+async function toggleReto(id, nuevoEstado) {
+  try {
+    const res  = await fetch(API + "/api/admin/retos/" + id + "/estado", { method:"PUT", headers, body: JSON.stringify({ activo: nuevoEstado }) })
+    const data = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast(nuevoEstado ? "✓ Reto activado" : "✓ Reto desactivado")
+    cargarRetos()
+  } catch { toast("✗ Error de conexion") }
+}
+
+async function eliminarReto(id) {
+  if (!confirm("¿Eliminar este reto definitivamente?")) return
+  try {
+    const res  = await fetch(API + "/api/admin/retos/" + id, { method: "DELETE", headers })
+    const data = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast("✓ Reto eliminado")
+    cargarRetos()
+  } catch { toast("✗ Error de conexion al eliminar") }
+}
 
 async function abrirModalReciclaje() {
   const select = document.getElementById("mrec-usuario")
@@ -1307,11 +1419,6 @@ async function guardarRecompensa() {
     cerrarModal("modal-recompensa")
     cargarRecompensas()
   } catch { toast("✗ Error de conexion al guardar") }
-}
-
-function guardarReto() {
-  toast("✓ Reto guardado (funcionalidad en desarrollo)")
-  cerrarModal("modal-reto")
 }
 
 // ── UTILIDADES ────────────────────────────────────────────

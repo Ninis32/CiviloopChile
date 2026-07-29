@@ -153,7 +153,7 @@ app.post("/recuperar-password", async (req, res) => {
   try {
     const usuario = await Usuario.findOne({ correo });
     if (!usuario)
-      return res.json({ mensaje: "Si el correo existe, recibiras un enlace." });
+      return res.json({ mensaje: "Si el correo valido, recibiras un enlace." });
 
     const token  = jwt.sign({ id: usuario._id }, process.env.JWT_SECRET, { expiresIn: "15m" });
     const enlace = `https://civiloopchile.onrender.com/restablecer.html?token=${token}`;
