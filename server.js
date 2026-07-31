@@ -5,6 +5,7 @@ const bcrypt   = require("bcryptjs");
 const jwt      = require("jsonwebtoken");
 const path     = require("path");
 const axios    = require("axios");
+const { type } = require("os");
 require("dotenv").config();
 // ── Catálogo único de materiales permitidos y su tarifa (pts/kg) ──
 const MATERIALES_PERMITIDOS = {
@@ -13,7 +14,7 @@ const MATERIALES_PERMITIDOS = {
   "Papel":    4,
   "Cartón":   4,
   "Metal":    8,
-  "Placas electronicas": 7
+  "Electrónicos": 7
 };
 
 function materialValido(tipo) {
@@ -68,6 +69,10 @@ const Reto = mongoose.model("Reto", new mongoose.Schema({
   descripcion:    String,
   meta_kg:        { type: Number, required: true, min: 0.1 },
   puntos_premio:  { type: Number, required: true, min: 1 },
+  material:       { type, String, enum: Object.keys(MATERIALES_PERMITIDOS), required: true },
+  fecha_inicio:   { type: Date, required: true},
+  fecha_fin:      { type: Date, required: true },
+  id_empresa:     { type: mongoose.Schema.Types.ObjectId, ref: "Empresa", default: null},
   activo:         { type: Boolean, default: true }
 }));
 
@@ -100,6 +105,16 @@ const Canje = mongoose.model("Canje", new mongoose.Schema({
   fecha_canje:       { type: Date, default: Date.now },
   estado_canje:      { type: String, default: "pendiente" }
 }));
+
+const ProgresoReto = mongoose.model("ProgresoReto", new mongoose.Schema({
+  id_usuario:       { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", required: true },
+  id_reto:          { type: mongoose.Schema.Types.ObjectId, ref:"Reto", required: true },
+  kg_acumulados:    { type: Number, default: 0},
+  completado:       { type: Boolean, default: false },
+  fecha_completado: { type: Date, default:null },
+}));
+// Un usuario no podria tener dos progresos paa el mismo reto
+ProgresoReto.schema.index({ id_usuario: 1, id_reto: 1}, { unique: true});
 
 // ── Middleware JWT ──────────────────────────
 function verificarJWT(req, res, next) {
@@ -260,7 +275,27 @@ app.get("/api/historial", verificarJWT, async (req, res) => {
     res.status(500).json({ mensaje: "Error al obtener historial" });
   }
 });
+app.get("/api/mis-retos", verificarJWT, async (req, res) => {
+  try {
+    const ahora = new Date();
+    const retosVigentes = await Reto.find({ activo: true, fecha_fin: { $gte: ahora } });
+    const progresos = await ProgresoReto.find({ id_usuario: req.user.id });
 
+    const resultado = retosVigentes.map(reto => {
+      const progreso = progresos.find(p => String(p.id_reto) === String(reto._id));
+      return {
+        reto,
+        kg_acumulados: progreso ? progreso.kg_acumulados : 0,
+        completado: progreso ? progreso.completado : false
+      };
+    });
+
+    res.json(resultado);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al obtener retos" });
+  }
+});
 // ── POST /api/reciclaje/qr ─────────────────────────────────
 app.post("/api/reciclaje/qr", verificarJWT, async (req, res) => {
   try {
@@ -475,7 +510,52 @@ app.put("/api/trabajador/historial/:id/aprobar", verificarJWT, soloTrabajador, a
     registro.id_trabajador = req.user.id;
     await registro.save();
     await Usuario.findByIdAndUpdate(registro.id_usuario, { $inc: { puntos_totales: registro.puntos_ganados } });
+const ahora = new Date();
+const retosAplicables = await Reto.find({
+    activo:true,
+    material: registro.tipo_material,
+    fecha_inicio:{ $lte: ahora },
+    fecha_fin:{ $gte: ahora }
+});
 
+for(const reto of retosAplicables){
+
+    let progreso = await ProgresoReto.findOne({
+        id_usuario: registro.id_usuario,
+        id_reto: reto._id
+    });
+
+    if(!progreso){
+        progreso = new ProgresoReto({
+            id_usuario: registro.id_usuario,
+            id_reto: reto._id
+        });
+    }
+
+    if(progreso.completado)
+        continue;
+
+    progreso.kg_acumulados += registro.cantidad;
+
+    if(progreso.kg_acumulados >= reto.meta_kg){
+
+        progreso.completado = true;
+        progreso.fecha_completado = ahora;
+
+        await Usuario.findByIdAndUpdate(
+            registro.id_usuario,
+            {
+                $inc:{
+                    puntos_totales: reto.puntos_premio
+                }
+            }
+        );
+
+    }
+
+    await progreso.save();
+
+}
     res.json({ mensaje: "Reciclaje aprobado", registro });
   } catch (err) {
     console.log(err);
@@ -614,13 +694,23 @@ app.get("/api/admin/retos", verificarJWT, soloAdmin, async (req, res) => {
 
 app.post("/api/admin/retos", verificarJWT, soloAdmin, async (req, res) => {
   try {
-    const { nombre, descripcion, meta_kg, puntos_premio } = req.body;
+    const { nombre, descripcion, meta_kg, puntos_premio, material, fecha_inicio, fecha_fin, id_empresa } = req.body;
     const meta = Number(meta_kg);
     const premio = Number(puntos_premio);
+
     if (!nombre) return res.status(400).json({ mensaje: "El nombre es obligatorio" });
     if (!Number.isFinite(meta) || meta <= 0) return res.status(400).json({ mensaje: "La meta en Kg debe ser mayor a 0" });
     if (!Number.isFinite(premio) || premio <= 0) return res.status(400).json({ mensaje: "Los puntos de premio deben ser mayor a 0" });
-    const nuevo = await new Reto({ nombre, descripcion, meta_kg: meta, puntos_premio: premio, activo: true }).save();
+    if (!materialValido(material)) return res.status(400).json({ mensaje: "Material no permitido" });
+    if (!fecha_inicio || !fecha_fin) return res.status(400).json({ mensaje: "Debes indicar fecha de inicio y fin" });
+    if (new Date(fecha_inicio) >= new Date(fecha_fin))
+      return res.status(400).json({ mensaje: "La fecha de inicio debe ser anterior a la fecha de fin" });
+
+    const nuevo = await new Reto({
+      nombre, descripcion, meta_kg: meta, puntos_premio: premio,
+      material, fecha_inicio, fecha_fin, id_empresa: id_empresa || null, activo: true
+    }).save();
+
     res.json({ mensaje: "Reto creado", reto: nuevo });
   } catch (err) {
     console.log("ERROR crear reto:", err.message);
@@ -630,17 +720,24 @@ app.post("/api/admin/retos", verificarJWT, soloAdmin, async (req, res) => {
 
 app.put("/api/admin/retos/:id", verificarJWT, soloAdmin, async (req, res) => {
   try {
-    const { nombre, descripcion, meta_kg, puntos_premio } = req.body;
+    const { nombre, descripcion, meta_kg, puntos_premio, material, fecha_inicio, fecha_fin, id_empresa } = req.body;
     const meta = Number(meta_kg);
     const premio = Number(puntos_premio);
+
     if (!nombre) return res.status(400).json({ mensaje: "El nombre es obligatorio" });
     if (!Number.isFinite(meta) || meta <= 0) return res.status(400).json({ mensaje: "La meta en Kg debe ser mayor a 0" });
     if (!Number.isFinite(premio) || premio <= 0) return res.status(400).json({ mensaje: "Los puntos de premio deben ser mayor a 0" });
+    if (!materialValido(material)) return res.status(400).json({ mensaje: "Material no permitido" });
+    if (!fecha_inicio || !fecha_fin) return res.status(400).json({ mensaje: "Debes indicar fecha de inicio y fin" });
+    if (new Date(fecha_inicio) >= new Date(fecha_fin))
+      return res.status(400).json({ mensaje: "La fecha de inicio debe ser anterior a la fecha de fin" });
+
     const actualizado = await Reto.findByIdAndUpdate(
       req.params.id,
-      { nombre, descripcion, meta_kg: meta, puntos_premio: premio },
+      { nombre, descripcion, meta_kg: meta, puntos_premio: premio, material, fecha_inicio, fecha_fin, id_empresa: id_empresa || null },
       { new: true, runValidators: true }
     );
+
     if (!actualizado) return res.status(404).json({ mensaje: "Reto no encontrado" });
     res.json({ mensaje: "Reto actualizado", reto: actualizado });
   } catch (err) {
@@ -826,6 +923,31 @@ app.get("/api/admin/canjes", verificarJWT, soloAdmin, async (req, res) => {
     res.json(canjes);
   } catch {
     res.status(500).json({ mensaje: "Error al obtener canjes" });
+  }
+});
+app.put("/api/admin/canjes/:id/estado", verificarJWT, soloAdmin, async (req, res) => {
+  try {
+    const { estado_canje } = req.body; // "entregado" o "cancelado"
+    if (!["entregado", "cancelado"].includes(estado_canje))
+      return res.status(400).json({ mensaje: "Estado invalido" });
+
+    const canje = await Canje.findById(req.params.id);
+    if (!canje) return res.status(404).json({ mensaje: "Canje no encontrado" });
+    if (canje.estado_canje !== "pendiente")
+      return res.status(400).json({ mensaje: "Este canje ya fue procesado" });
+
+    canje.estado_canje = estado_canje;
+    await canje.save();
+
+    if (estado_canje === "cancelado") {
+      await Usuario.findByIdAndUpdate(canje.id_usuario, { $inc: { puntos_totales: canje.puntos_utilizados } });
+      await Beneficio.findByIdAndUpdate(canje.id_beneficio, { $inc: { stock: 1 } });
+    }
+
+    res.json({ mensaje: `Canje ${estado_canje}`, canje });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al actualizar canje" });
   }
 });
 
