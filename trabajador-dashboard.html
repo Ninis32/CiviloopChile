@@ -11,8 +11,9 @@
 
   .sidebar{
     width:240px; background:#1A5C35; color:white;
-    display:flex; flex-direction:column; min-height:100vh;
+    display:flex; flex-direction:column; height:100vh;
     position:fixed; top:0; left:0; z-index:100;
+    overflow-y:auto;
   }
   .sidebar-logo{ padding:1.5rem 1rem; border-bottom:1px solid rgba(255,255,255,0.15); text-align:center; }
   .sidebar-logo h2{ font-size:1.1rem; color:white; }
@@ -50,8 +51,11 @@
   .stat-label{ font-size:0.8rem; color:#888; margin-top:2px; }
 
   .card{ background:white; border-radius:12px; padding:1.25rem; box-shadow:0 1px 4px rgba(0,0,0,0.06); margin-bottom:1rem; }
-  .card-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+  .card-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:8px; }
   .card-header h3{ font-size:1rem; color:#1A5C35; }
+
+  .filtros{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .filtros select, .filtros input{ padding:0.4rem 0.6rem; border:1px solid #ddd; border-radius:6px; font-size:0.8rem; }
 
   table{ width:100%; border-collapse:collapse; font-size:0.85rem; }
   th{ text-align:left; padding:0.6rem 0.75rem; background:#f9fff9; color:#1A5C35; font-weight:600; border-bottom:2px solid #e8f5e9; }
@@ -71,6 +75,7 @@
 
   #toast{ position:fixed; bottom:1.5rem; right:1.5rem; background:#1A5C35; color:white; padding:0.6rem 1.2rem; border-radius:20px; font-size:0.85rem; display:none; z-index:9999; }
   .vacio{ text-align:center; color:#aaa; padding:1rem; }
+  .obs{ color:#999; font-size:0.78rem; }
 </style>
 </head>
 <body>
@@ -115,6 +120,14 @@
         <div class="stat-num" id="num-aprobados">0</div>
         <div class="stat-label">Aprobados (últimos 50)</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-num" id="num-kg">0</div>
+        <div class="stat-label">Kg totales validados</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="num-pts">0</div>
+        <div class="stat-label">Puntos totales otorgados</div>
+      </div>
     </div>
 
     <div class="card">
@@ -130,13 +143,22 @@
     </div>
 
     <div class="card">
-      <div class="card-header"><h3>📋 Historial procesado</h3></div>
+      <div class="card-header">
+        <h3>📋 Historial procesado</h3>
+        <div class="filtros">
+          <select id="filtro-estado" onchange="renderHistorial()">
+            <option value="">Todos los estados</option>
+            <option value="aprobado">Solo aprobados</option>
+            <option value="rechazado">Solo rechazados</option>
+          </select>
+        </div>
+      </div>
       <table>
         <thead>
-          <tr><th>Usuario</th><th>Material</th><th>Kg</th><th>Puntos</th><th>Estado</th><th>Fecha</th></tr>
+          <tr><th>Usuario</th><th>Material</th><th>Kg</th><th>Puntos</th><th>Estado</th><th>Punto limpio</th><th>Observaciones</th><th>Fecha y hora</th></tr>
         </thead>
         <tbody id="tabla-historial">
-          <tr><td colspan="6" class="vacio">Cargando...</td></tr>
+          <tr><td colspan="8" class="vacio">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -153,7 +175,7 @@ const API = (window.location.port === "5500" || window.location.port === "5501")
   ? "https://civiloopchile.onrender.com"
   : "";
 
-if (!token || !usuario || (usuario.rol !== "trabajador" && usuario.rol !== "administrador")) {
+if (!token || !usuario || (usuario.rol !== "trabajador" && usuario.rol !== "administrador" && usuario.rol !== "admin")) {
   window.location.href = "index.html"
 }
 
@@ -161,6 +183,7 @@ document.getElementById("trabajador-nombre").textContent = usuario.nombre || "Tr
 document.getElementById("avatar-letra").textContent      = (usuario.nombre || "T")[0].toUpperCase()
 
 const headers = { "Content-Type": "application/json", "Authorization": "Bearer " + token }
+let historialFullCache = []
 
 function toast(msg) {
   const t = document.getElementById("toast")
@@ -218,29 +241,50 @@ async function cargarHistorial() {
   try {
     const res  = await fetch(API + "/api/trabajador/historial", { headers })
     const data = await res.json()
-    if (!res.ok || !data.length) {
+    if (!res.ok) {
       document.getElementById("tabla-historial").innerHTML =
-        '<tr><td colspan="6" class="vacio">Sin registros procesados aún</td></tr>'
-      document.getElementById("num-aprobados").textContent = "0"
+        `<tr><td colspan="8" class="vacio">${data.mensaje || "Error"}</td></tr>`
+      historialFullCache = []
+      actualizarResumen()
       return
     }
-    document.getElementById("num-aprobados").textContent =
-      data.filter(h => h.estado === "aprobado").length
+    historialFullCache = Array.isArray(data) ? data : []
+    renderHistorial()
+  } catch {
+    document.getElementById("tabla-historial").innerHTML =
+      '<tr><td colspan="8" class="vacio">Error de conexión</td></tr>'
+  }
+}
 
-    document.getElementById("tabla-historial").innerHTML = data.map(h => `
+function renderHistorial() {
+  const filtro = document.getElementById("filtro-estado").value
+  const lista  = filtro ? historialFullCache.filter(h => h.estado === filtro) : historialFullCache
+
+  if (!lista.length) {
+    document.getElementById("tabla-historial").innerHTML =
+      '<tr><td colspan="8" class="vacio">Sin registros procesados aún</td></tr>'
+  } else {
+    document.getElementById("tabla-historial").innerHTML = lista.map(h => `
       <tr>
         <td>${h.id_usuario?.nombre || "Usuario"}</td>
         <td>${h.tipo_material}</td>
         <td>${h.cantidad}</td>
         <td>${h.puntos_ganados} pts</td>
         <td><span class="badge ${h.estado === 'aprobado' ? 'badge-verde' : 'badge-rojo'}">${h.estado}</span></td>
-        <td>${new Date(h.fecha_actividad).toLocaleDateString("es-CL")}</td>
+        <td>${h.nombre_punto || "—"}</td>
+        <td class="obs">${h.observaciones || "—"}</td>
+        <td>${new Date(h.fecha_actividad).toLocaleString("es-CL")}</td>
       </tr>
     `).join("")
-  } catch {
-    document.getElementById("tabla-historial").innerHTML =
-      '<tr><td colspan="6" class="vacio">Error de conexión</td></tr>'
   }
+  actualizarResumen()
+}
+
+function actualizarResumen() {
+  const aprobados = historialFullCache.filter(h => h.estado === "aprobado")
+  document.getElementById("num-aprobados").textContent = aprobados.length
+  document.getElementById("num-kg").textContent = aprobados.reduce((s, h) => s + (h.cantidad || 0), 0).toFixed(1)
+  document.getElementById("num-pts").textContent = aprobados.reduce((s, h) => s + (h.puntos_ganados || 0), 0)
 }
 
 async function aprobar(id) {

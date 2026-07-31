@@ -40,6 +40,22 @@
 
   document.getElementById("mis-puntos").textContent = usuario.puntos_totales + " Puntos Disponibles"
 
+  // Refrescar puntos reales desde el servidor (localStorage puede estar desactualizado
+  // si un trabajador aprobo un reciclaje despues de que iniciaste sesion)
+  async function actualizarPuntos() {
+    try {
+      const res  = await fetch("https://civiloopchile.onrender.com/perfil", {
+        headers: { "Authorization": "Bearer " + token }
+      })
+      const data = await res.json()
+      if (res.ok) {
+        usuario.puntos_totales = data.puntos_totales
+        localStorage.setItem("usuario", JSON.stringify(usuario))
+        document.getElementById("mis-puntos").textContent = usuario.puntos_totales + " Puntos Disponibles"
+      }
+    } catch {}
+  }
+
   // Cargar beneficios desde MongoDB
   async function cargarBeneficios() {
     try {
@@ -118,7 +134,11 @@
     setTimeout(() => t.style.display = "none", 3000)
   }
 
-  cargarBeneficios()
+  async function iniciar() {
+    await actualizarPuntos()
+    cargarBeneficios()
+  }
+  iniciar()
 </script>
 </body>
 </html>

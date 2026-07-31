@@ -141,6 +141,8 @@
     .btn-bloquear{ background:#fce4ec; color:#c62828; }
     .btn-editar{   background:#e3f2fd; color:#1565C0; }
     .btn-eliminar{ background:#fce4ec; color:#c62828; }
+    .btn-aprobar{  background:#e8f5e9; color:#2E8B57; }
+    .btn-rechazar{ background:#fff3e0; color:#E65100; }
 
     /* ── Formulario modal ── */
     .modal-overlay{
@@ -663,15 +665,17 @@
       <option value="Placas electronicas">Placas electronicas</option>
     </select>
     <label>Meta (Kg a reciclar)</label>
-    <input type="number" id="reto-meta" placeholder="10">
+    <input type="number" id="reto-meta" placeholder="10" min="0.1" step="0.1">
+    <label>Puntos de premio</label>
+    <input type="number" id="reto-pts" placeholder="200" min="1">
     <label>Fecha inicio</label>
     <input type="date" id="reto-fecha-inicio">
     <label>Fecha fin</label>
     <input type="date" id="reto-fecha-fin">
     <label>Empresa patrocinadora</label>
     <select id="reto-empresa">
-    <label>Puntos de premio</label>
-    <input type="number" id="reto-pts" placeholder="200">
+      <option value="">Sin empresa asociada</option>
+    </select>
     <div class="modal-btns">
       <button class="btn-cancelar" onclick="cerrarModal('modal-reto')">Cancelar</button>
       <button class="btn-guardar" onclick="guardarReto()">Guardar</button>
@@ -1016,8 +1020,8 @@ async function cargarRecompensas() {
   }
 }
 
-async function cargarSelectEmpresas(seleccionado) {
-  const select = document.getElementById("mr-empresa")
+async function cargarSelectEmpresas(seleccionado, selectId) {
+  const select = document.getElementById(selectId || "mr-empresa")
   try {
     const res = await fetch(API + "/api/admin/empresas", { headers })
     const empresas = await res.json()
@@ -1158,6 +1162,10 @@ async function cargarReportes() {
           <td>${h.nombre_punto || "—"}</td>
           <td>${new Date(h.fecha_actividad).toLocaleDateString("es-CL")}</td>
           <td>
+            ${h.estado === "pendiente" ? `
+              <button class="btn-accion btn-aprobar" onclick="aprobarReciclaje('${h._id}')">✓ Aprobar</button>
+              <button class="btn-accion btn-rechazar" onclick="rechazarReciclaje('${h._id}')">✗ Rechazar</button>
+            ` : ""}
             <button class="btn-accion btn-editar" onclick="editarReciclaje('${h._id}')">Editar</button>
             <button class="btn-accion btn-eliminar" onclick="eliminarReciclaje('${h._id}')">Eliminar</button>
           </td>
@@ -1231,6 +1239,27 @@ async function eliminarReciclaje(id) {
   } catch { toast("✗ Error de conexion al eliminar") }
 }
 
+async function aprobarReciclaje(id) {
+  try {
+    const res  = await fetch(API + "/api/trabajador/historial/" + id + "/aprobar", { method: "PUT", headers })
+    const data = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast("✓ Reciclaje aprobado y puntos acreditados")
+    cargarReportes()
+  } catch { toast("✗ Error de conexion") }
+}
+
+async function rechazarReciclaje(id) {
+  if (!confirm("¿Rechazar este reciclaje? El usuario no recibira puntos.")) return
+  try {
+    const res  = await fetch(API + "/api/trabajador/historial/" + id + "/rechazar", { method: "PUT", headers })
+    const data = await res.json()
+    if (!res.ok) { toast("✗ " + data.mensaje); return }
+    toast("✓ Reciclaje rechazado")
+    cargarReportes()
+  } catch { toast("✗ Error de conexion") }
+}
+
 async function guardarReciclaje() {
   const id = document.getElementById("mrec-id").value
   const body = {
@@ -1302,7 +1331,11 @@ function abrirModalReto() {
   document.getElementById("reto-desc").value   = ""
   document.getElementById("reto-meta").value   = ""
   document.getElementById("reto-pts").value    = ""
+  document.getElementById("reto-material").value = ""
+  document.getElementById("reto-fecha-inicio").value = ""
+  document.getElementById("reto-fecha-fin").value = ""
   document.getElementById("reto-titulo").textContent = "🏆 Nuevo Reto"
+  cargarSelectEmpresas("", "reto-empresa")
   document.getElementById("modal-reto").classList.add("show")
 }
 
@@ -1314,7 +1347,11 @@ function editarReto(id) {
   document.getElementById("reto-desc").value   = r.descripcion || ""
   document.getElementById("reto-meta").value   = r.meta_kg
   document.getElementById("reto-pts").value    = r.puntos_premio
+  document.getElementById("reto-material").value = r.material || ""
+  document.getElementById("reto-fecha-inicio").value = r.fecha_inicio ? r.fecha_inicio.slice(0, 10) : ""
+  document.getElementById("reto-fecha-fin").value    = r.fecha_fin ? r.fecha_fin.slice(0, 10) : ""
   document.getElementById("reto-titulo").textContent = "🏆 Editar Reto"
+  cargarSelectEmpresas(r.id_empresa?._id || r.id_empresa || "", "reto-empresa")
   document.getElementById("modal-reto").classList.add("show")
 }
 
@@ -1324,7 +1361,11 @@ async function guardarReto() {
     nombre:        document.getElementById("reto-nombre").value,
     descripcion:   document.getElementById("reto-desc").value,
     meta_kg:       parseFloat(document.getElementById("reto-meta").value),
-    puntos_premio: parseInt(document.getElementById("reto-pts").value)
+    puntos_premio: parseInt(document.getElementById("reto-pts").value),
+    material:      document.getElementById("reto-material").value,
+    fecha_inicio:  document.getElementById("reto-fecha-inicio").value,
+    fecha_fin:     document.getElementById("reto-fecha-fin").value,
+    id_empresa:    document.getElementById("reto-empresa").value || null
   }
   try {
     const url    = id ? API + "/api/admin/retos/" + id : API + "/api/admin/retos"
