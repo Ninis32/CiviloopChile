@@ -275,6 +275,34 @@ app.get("/api/historial", verificarJWT, async (req, res) => {
     res.status(500).json({ mensaje: "Error al obtener historial" });
   }
 });
+
+// PUT /api/historial/:id — el propio ciudadano edita su registro, solo mientras siga pendiente
+app.put("/api/historial/:id", verificarJWT, async (req, res) => {
+  try {
+    const registro = await Historial.findOne({ _id: req.params.id, id_usuario: req.user.id });
+    if (!registro) return res.status(404).json({ mensaje: "Registro no encontrado" });
+    if (registro.estado !== "pendiente")
+      return res.status(400).json({ mensaje: "Este registro ya fue validado y no se puede editar" });
+
+    const { tipo_material, cantidad, observaciones } = req.body;
+    if (!materialValido(tipo_material))
+      return res.status(400).json({ mensaje: "Material no permitido" });
+    const kilos = Number(cantidad);
+    if (!Number.isFinite(kilos) || kilos <= 0)
+      return res.status(400).json({ mensaje: "Cantidad de kilos invalida" });
+
+    registro.tipo_material  = tipo_material;
+    registro.cantidad       = kilos;
+    registro.observaciones  = observaciones;
+    registro.puntos_ganados = calcularPuntos(tipo_material, kilos);
+    await registro.save();
+
+    res.json({ mensaje: "Registro actualizado", registro });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al actualizar registro" });
+  }
+});
 app.get("/api/mis-retos", verificarJWT, async (req, res) => {
   try {
     const ahora = new Date();
@@ -296,6 +324,21 @@ app.get("/api/mis-retos", verificarJWT, async (req, res) => {
     res.status(500).json({ mensaje: "Error al obtener retos" });
   }
 });
+// DELETE /api/historial/:id — el propio ciudadano elimina su registro, solo mientras siga pendiente
+app.delete("/api/historial/:id", verificarJWT, async (req, res) => {
+  try {
+    const registro = await Historial.findOne({ _id: req.params.id, id_usuario: req.user.id });
+    if (!registro) return res.status(404).json({ mensaje: "Registro no encontrado" });
+    if (registro.estado !== "pendiente")
+      return res.status(400).json({ mensaje: "Este registro ya fue validado y no se puede eliminar" });
+    await Historial.findByIdAndDelete(req.params.id);
+    res.json({ mensaje: "Registro eliminado" });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ mensaje: "Error al eliminar registro" });
+  }
+});
+
 // ── POST /api/reciclaje/qr ─────────────────────────────────
 app.post("/api/reciclaje/qr", verificarJWT, async (req, res) => {
   try {

@@ -114,20 +114,20 @@
     <h3>✏️ Editar Reciclaje</h3>
     <input type="hidden" id="edit-id">
 
-    <label>Tipo de Material</label>
+    <label for="edit-material">Tipo de Material</label>
     <select id="edit-material">
       <option value="Plástico">Plástico</option>
       <option value="Vidrio">Vidrio</option>
       <option value="Papel">Papel</option>
       <option value="Cartón">Cartón</option>
       <option value="Metal">Metal</option>
-      <option value="Metal">Electrónicos</option>
+      <option value="Placas electronicas">Placas electrónicas</option>
     </select>
 
-    <label>Cantidad (Kg)</label>
+    <label for="edit-cantidad">Cantidad (Kg)</label>
     <input type="number" id="edit-cantidad" min="0.1" step="0.1">
 
-    <label>Observaciones</label>
+    <label for="edit-observaciones">Observaciones</label>
     <textarea id="edit-observaciones" rows="2" placeholder="Comentario opcional"></textarea>
 
     <div class="modal-btns">
@@ -183,6 +183,9 @@
             ${h.estado === "pendiente" ? `
               <button class="btn-editar" onclick="abrirEditar('${h._id}','${h.tipo_material}',${h.cantidad||0},'${h.observaciones||""}')">
                 ✏️ Editar
+              </button>
+              <button class="btn-editar" style="border-color:#c62828;color:#c62828" onclick="eliminarPropio('${h._id}')">
+                🗑️ Eliminar
               </button>` : ""}
           </div>
           <span style="color:${h.estado==='rechazado'?'#c62828':'#2E8B57'};font-weight:700;white-space:nowrap">${h.estado==='aprobado'?'+':''}${h.puntos_ganados} pts</span>
@@ -244,6 +247,25 @@
         toast("✓ " + data.mensaje)
         cargarHistorial()
         actualizarPuntos()
+      } else {
+        toast("✗ " + data.mensaje)
+      }
+    } catch {
+      toast("✗ Error de conexión")
+    }
+  }
+
+  async function eliminarPropio(id) {
+    if (!confirm("¿Eliminar este registro de reciclaje? No se puede deshacer.")) return
+    try {
+      const res  = await fetch("/api/historial/" + id, {
+        method:  "DELETE",
+        headers: { "Authorization": "Bearer " + token }
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast("✓ " + data.mensaje)
+        cargarHistorial()
       } else {
         toast("✗ " + data.mensaje)
       }
