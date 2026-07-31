@@ -69,7 +69,7 @@ const Reto = mongoose.model("Reto", new mongoose.Schema({
   descripcion:    String,
   meta_kg:        { type: Number, required: true, min: 0.1 },
   puntos_premio:  { type: Number, required: true, min: 1 },
-  material:       { type, String, enum: Object.keys(MATERIALES_PERMITIDOS), required: true },
+  material:       { type: String, enum: Object.keys(MATERIALES_PERMITIDOS), required: true },
   fecha_inicio:   { type: Date, required: true},
   fecha_fin:      { type: Date, required: true },
   id_empresa:     { type: mongoose.Schema.Types.ObjectId, ref: "Empresa", default: null},

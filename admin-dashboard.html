@@ -405,12 +405,12 @@
         </div>
         <table>
           <thead>
-            <tr><th>Reto</th><th>Descripción</th><th>Meta</th><th>Puntos premio</th><th>Estado</th><th>Acciones</th></tr>
+            <tr><th>Reto</th><th>Material><th>Meta</th><th>Vigencia</th><th>Empresa><th>puntos_premio/th></tr><th>Estado/th><th>Acciones/th>
           </thead>
           <tbody id="tabla-retos">
-            <tr><td colspan="6" style="text-align:center;color:#aaa">
+            <tr><td colspan="8" style="text-align:center;color:#aaa">
               <p style="padding:1rem">Los retos son desafíos de reciclaje.<br>
-              Ejemplo: "Recicla 10kg este mes y gana 200 puntos extra"</p>
+              Ejemplo: "Recicla 10kg de Plástico entre el 1 y 15 de septiembre"</p>
             </td></tr>
           </tbody>
         </table>
@@ -643,8 +643,24 @@
     <input type="text" id="reto-nombre" placeholder="Ej: Rey del Reciclaje">
     <label>Descripción</label>
     <textarea id="reto-desc" rows="2" placeholder="Ej: Recicla 10kg este mes"></textarea>
+    <label>Material</label>
+    <select id="reto-material">
+      <option value="">Seleccione</option>
+      <option value="Plástico">Plástico</option>
+      <option value="Vidrio">Vidrio</option>
+      <option value="Papel">Papel</option>
+      <option value="Cartón">Cartón</option>
+      <option value="Metal">Metal</option>
+      <option value="Placas electronicas">Placas electronicas</option>
+    </select>
     <label>Meta (Kg a reciclar)</label>
     <input type="number" id="reto-meta" placeholder="10">
+    <label>Fecha inicio</label>
+    <input type="date" id="reto-fecha-inicio">
+    <label>Fecha fin</label>
+    <input type="date" id="reto-fecha-fin">
+    <label>Empresa patrocinadora</label>
+    <select id="reto-empresa">
     <label>Puntos de premio</label>
     <input type="number" id="reto-pts" placeholder="200">
     <div class="modal-btns">
