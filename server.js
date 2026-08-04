@@ -11,9 +11,9 @@ require("dotenv").config();
 const MATERIALES_PERMITIDOS = {
   "Plástico": 5,
   "Vidrio":   3,
-  "Papel":    4,
-  "Cartón":   4,
-  "Metal":    8,
+  "Papel y Cartón":   4,
+  "Envases Tetra Pak":  5,
+  "Metal y Aluminios":    8,
   "Electrónicos": 7
 };
 
