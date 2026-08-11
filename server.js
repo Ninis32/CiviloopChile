@@ -5,6 +5,7 @@ const bcrypt   = require("bcryptjs");
 const jwt      = require("jsonwebtoken");
 const path     = require("path");
 const axios    = require("axios");
+const QRCode = require("qrcode");
 const { type } = require("os");
 require("dotenv").config();
 const { OAuth2Client } = require("google-auth-library");
@@ -449,12 +450,37 @@ app.post("/api/canjes", verificarJWT, async (req, res) => {
     const usuario = await Usuario.findById(req.user.id);
     if (usuario.puntos_totales < beneficio.puntos_requeridos)
       return res.status(400).json({ mensaje: "Puntos insuficientes" });
+    
+    // 1. Generar código único de cupón
+    const codigo_cupon = "CUPON-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    // 2. Generar QR dinámico en formato DataURL (Base64) usando tu librería local
+    const qrDataURL = await QRCode.toDataURL(codigo_cupon, {
+      color: { dark: "#1A5C35", light: "#FFFFFF" },
+      width: 250,
+      margin: 2
+    });
+
+    // 3. Aplicar cambios en base de datos
     await Usuario.findByIdAndUpdate(req.user.id, { $inc: { puntos_totales: -beneficio.puntos_requeridos } });
     await Beneficio.findByIdAndUpdate(id_beneficio, { $inc: { stock: -1 } });
-    await new Canje({ id_usuario: req.user.id, id_beneficio, puntos_utilizados: beneficio.puntos_requeridos }).save();
-    res.json({ mensaje: "Canje realizado con exito" });
+
+    const nuevoCanje = await new Canje({
+      id_usuario: req.user.id,
+      id_beneficio,
+      puntos_utilizados: beneficio.puntos_requeridos,
+      codigo_cupon
+    }).save();
+
+    res.json({
+      mensaje: "Canje realizado con éxito",
+      codigo_cupon,
+      qr_image: qrDataURL, // 👈 La imagen llega lista en Base64
+      canje: nuevoCanje
+    });
+
   } catch (err) {
-    console.log(err);
+    console.error("Error al canjear:", err);
     res.status(500).json({ mensaje: "Error al realizar canje" });
   }
 });
