@@ -659,41 +659,31 @@
       <option value="Vidrio">Vidrio</option>
       <option value="Papel y Cartón">Papel y Cartón</option>
       <option value="Envases Tetra Pak">Envases Tetra Pak</option>
-      <option value="Metal">Metal y Aluminios</option>
+      <option value="Metal y Aluminios">Metal y Aluminios</option>
       <option value="Electrónicos">Electrónicos</option>
     </select>
-    <label>Material</label>
-<select id="reto-material">
-    <option value="">Seleccione un material</option>
-    <option value="Plástico">Plástico</option>
-    <option value="Vidrio">Vidrio</option>
-    <option value="Papel y Cartón">Papel y Cartón</option>
-    <option value="Envases Tetra Pak">Envases Tetra Pak</option>
-    <option value="Metal">Metal y Aluminios</option>
-    <option value="Electrónicos">Electrónicos</option>
-</select>
 
-<label>Meta (Kg a reciclar)</label>
-<input type="number" id="reto-meta" placeholder="10">
+    <label>Meta (Kg a reciclar)</label>
+    <input type="number" id="reto-meta" placeholder="10">
 
-<label>Fecha inicio</label>
-<input type="date" id="reto-fecha-inicio">
+    <label>Fecha inicio</label>
+    <input type="date" id="reto-fecha-inicio">
 
-<label>Fecha fin</label>
-<input type="date" id="reto-fecha-fin">
+    <label>Fecha fin</label>
+    <input type="date" id="reto-fecha-fin">
 
-<label>Empresa patrocinadora</label>
-<select id="reto-empresa">
-    <option value="">Sin empresa patrocinadora</option>
-</select>
+    <label>Empresa patrocinadora</label>
+    <select id="reto-empresa">
+      <option value="">Sin empresa patrocinadora</option>
+    </select>
 
-<label>Puntos de premio</label>
-<input type="number" id="reto-pts" placeholder="200">
+    <label>Puntos de premio</label>
+    <input type="number" id="reto-pts" placeholder="200">
 
-<div class="modal-btns">
-    <button class="btn-cancelar" onclick="cerrarModal('modal-reto')">Cancelar</button>
-    <button class="btn-guardar" onclick="guardarReto()">Guardar</button>
-</div>
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="cerrarModal('modal-reto')">Cancelar</button>
+      <button class="btn-guardar" onclick="guardarReto()">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -1035,8 +1025,8 @@ async function cargarRecompensas() {
   }
 }
 
-async function cargarSelectEmpresas(seleccionado) {
-  const select = document.getElementById("mr-empresa")
+async function cargarSelectEmpresas(seleccionado, selectId) {
+  const select = document.getElementById(selectId || "mr-empresa")
   try {
     const res = await fetch(API + "/api/admin/empresas", { headers })
     const empresas = await res.json()
@@ -1321,7 +1311,11 @@ function abrirModalReto() {
   document.getElementById("reto-desc").value   = ""
   document.getElementById("reto-meta").value   = ""
   document.getElementById("reto-pts").value    = ""
+  document.getElementById("reto-material").value = ""
+  document.getElementById("reto-fecha-inicio").value = ""
+  document.getElementById("reto-fecha-fin").value = ""
   document.getElementById("reto-titulo").textContent = "🏆 Nuevo Reto"
+  cargarSelectEmpresas("", "reto-empresa")
   document.getElementById("modal-reto").classList.add("show")
 }
 
@@ -1333,7 +1327,11 @@ function editarReto(id) {
   document.getElementById("reto-desc").value   = r.descripcion || ""
   document.getElementById("reto-meta").value   = r.meta_kg
   document.getElementById("reto-pts").value    = r.puntos_premio
+  document.getElementById("reto-material").value = r.material || ""
+  document.getElementById("reto-fecha-inicio").value = r.fecha_inicio ? r.fecha_inicio.slice(0, 10) : ""
+  document.getElementById("reto-fecha-fin").value    = r.fecha_fin ? r.fecha_fin.slice(0, 10) : ""
   document.getElementById("reto-titulo").textContent = "🏆 Editar Reto"
+  cargarSelectEmpresas(r.id_empresa?._id || r.id_empresa || "", "reto-empresa")
   document.getElementById("modal-reto").classList.add("show")
 }
 
@@ -1343,7 +1341,11 @@ async function guardarReto() {
     nombre:        document.getElementById("reto-nombre").value,
     descripcion:   document.getElementById("reto-desc").value,
     meta_kg:       parseFloat(document.getElementById("reto-meta").value),
-    puntos_premio: parseInt(document.getElementById("reto-pts").value)
+    puntos_premio: parseInt(document.getElementById("reto-pts").value),
+    material:      document.getElementById("reto-material").value,
+    fecha_inicio:  document.getElementById("reto-fecha-inicio").value,
+    fecha_fin:     document.getElementById("reto-fecha-fin").value,
+    id_empresa:    document.getElementById("reto-empresa").value || null
   }
   try {
     const url    = id ? API + "/api/admin/retos/" + id : API + "/api/admin/retos"
