@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard – CiviLoop Chile</title>
   <link rel="stylesheet" href="css/style.css">
+  <!-- Librería para la animación de confeti/cotillón -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
   <style>
     .btn-editar {
       background: none;
@@ -245,6 +247,14 @@
       if (res.ok) {
         cerrarModal()
         toast("✓ " + data.mensaje)
+        // 🚀 Animación de Cotillón / Confeti
+      if (typeof confetti === "function") {
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
         cargarHistorial()
         actualizarPuntos()
       } else {
