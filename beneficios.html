@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Beneficios – CiviLoop Chile</title>
   <link rel="stylesheet" href="css/style.css">
+
+  <!-- Librería para la animación de confeti/cotillón -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
 </head>
 <body>
 
@@ -40,8 +43,7 @@
 
   document.getElementById("mis-puntos").textContent = usuario.puntos_totales + " Puntos Disponibles"
 
-  // Refrescar puntos reales desde el servidor (localStorage puede estar desactualizado
-  // si un trabajador aprobo un reciclaje despues de que iniciaste sesion)
+  // Refrescar puntos reales desde el servidor
   async function actualizarPuntos() {
     try {
       const res  = await fetch("https://civiloopchile.onrender.com/perfil", {
@@ -113,6 +115,15 @@
       const data = await res.json()
 
       if (res.ok) {
+        // 🚀 Disparar cotillón / confeti
+        if (typeof confetti === "function") {
+          confetti({
+            particleCount: 120,
+            spread: 80,
+            origin: { y: 0.6 }
+          });
+        }
+
         // Actualizar puntos en localStorage
         usuario.puntos_totales -= puntos
         localStorage.setItem("usuario", JSON.stringify(usuario))
