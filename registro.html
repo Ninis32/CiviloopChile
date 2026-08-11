@@ -6,6 +6,8 @@
 <title>Registro - CiviLoop Chile</title>
 
 <link rel="stylesheet" href="css/style.css">
+<!-- 1. Librería oficial de Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 
 <body>
@@ -23,11 +25,11 @@
     </p>
 
     <div class="tabs">
-        <button onclick="window.location='index.html'">
+        <button type="button" onclick="window.location='index.html'">
             Iniciar sesión
         </button>
 
-        <button class="activo">
+        <button type="button" class="activo">
             Registrarse
         </button>
     </div>
@@ -54,13 +56,13 @@
 
         <label>Confirmar contraseña</label>
         <input
-            type="password"
+            type="password" id="confirmar_password"
             placeholder="********"
         >
 
-        <label>región</label>
+        <label>Región</label>
         <select id="region">
-            <option>Selecciona una región</option>
+            <option value="">Selecciona una región</option>
             <option>Región Metropolitana</option>
             <option>Valparaíso</option>
             <option>Biobío</option>
@@ -68,14 +70,61 @@
             <option>Los Lagos</option>
         </select>
 
-        <button class="btn-login">
+        <button type="submit" class="btn-login">
             Crear Cuenta
         </button>
 
     </form>
 
+    <!-- Separador visual -->
+    <div style="margin: 15px 0; text-align: center; color: #888;">o</div>
+
+    <!-- 2. Botón oficial de Google -->
+    <div style="display: flex; justify-content: center; margin-bottom: 10px;">
+        <div id="g_id_onload"
+             data-client_id="327987732884-qvqrhs0lo19k47m82ss6n5r630o598ob.apps.googleusercontent.com"
+             data-callback="handleCredentialResponse">
+        </div>
+        <div class="g_id_signin" 
+             data-type="standard" 
+             data-size="large" 
+             data-theme="outline" 
+             data-text="signup_with"
+             data-shape="rectangular"
+             data-logo_alignment="left">
+        </div>
+    </div>
+
 </div>
+
 <script src="script.js"></script>
+
+<!-- 3. Manejador de respuesta de Google -->
+<script>
+async function handleCredentialResponse(response) {
+  try {
+    const res = await fetch("/api/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: response.credential })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("usuario", JSON.stringify(data.usuario));
+      alert("¡Registro exitoso! Bienvenido/a " + data.usuario.nombre);
+      window.location.href = "index.html";
+    } else {
+      alert("Error: " + data.mensaje);
+    }
+  } catch (err) {
+    console.error("Error al autenticar:", err);
+    alert("Error de conexión con el servidor");
+  }
+}
+</script>
 
 </body>
 </html>
