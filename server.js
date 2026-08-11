@@ -7,6 +7,8 @@ const path     = require("path");
 const axios    = require("axios");
 const { type } = require("os");
 require("dotenv").config();
+const { OAuth2Client } = require("google-auth-library");
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // ── Catálogo único de materiales permitidos y su tarifa (pts/kg) ──
 const MATERIALES_PERMITIDOS = {
   "Plástico": 5,
@@ -76,14 +78,18 @@ const Reto = mongoose.model("Reto", new mongoose.Schema({
   activo:         { type: Boolean, default: true }
 }));
 
-const Beneficio = mongoose.model("Beneficio", new mongoose.Schema({
+// 1. Declaras el esquema especificando la colección exacta de MongoDB
+const beneficioSchema = new mongoose.Schema({
   titulo:            String,
   descripcion:       String,
   puntos_requeridos: { type: Number, required: true },
   stock:             { type: Number, default: 0 },
   id_empresa:        { type: mongoose.Schema.Types.ObjectId, ref: "Empresa", default: null },
   activo:            { type: Boolean, default: true }
-}));
+}, { collection: "beneficios" }); // 👈 Especifica el nombre exacto de la colección
+
+// 2. Creas el modelo usando ese esquema
+const Beneficio = mongoose.model("Beneficio", beneficioSchema);
 
 const Historial = mongoose.model("Historial", new mongoose.Schema({
   id_usuario:     { type: mongoose.Schema.Types.ObjectId, ref: "Usuario" },
@@ -116,6 +122,66 @@ const ProgresoReto = mongoose.model("ProgresoReto", new mongoose.Schema({
 // Un usuario no podria tener dos progresos paa el mismo reto
 ProgresoReto.schema.index({ id_usuario: 1, id_reto: 1}, { unique: true});
 
+// ── POST /api/auth/google ──────────────────────────────────
+app.post("/api/auth/google", async (req, res) => {
+  const { credential } = req.body;
+
+  try {
+    // 1. Verificar el token recibido de Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name } = payload;
+
+    // 2. Buscar si el usuario ya existe usando el campo "correo"
+    let usuario = await Usuario.findOne({ correo: email });
+
+    if (!usuario) {
+      // 3. Crear contraseña aleatoria encriptada (requerida por el schema)
+      const passwordDummy = await bcrypt.hash(Math.random().toString(36), 12);
+
+      usuario = new Usuario({
+        nombre: name,
+        correo: email,
+        password: passwordDummy,
+        region: "Google Auth",
+        puntos_totales: 0,
+        rol: "ciudadano"
+      });
+      await usuario.save();
+    }
+
+    if (!usuario.activo) {
+      return res.status(403).json({ mensaje: "Cuenta bloqueada" });
+    }
+
+    // 4. Generar el JWT usando process.env.JWT_SECRET
+    const token = jwt.sign(
+      { id: usuario._id, correo: usuario.correo, rol: usuario.rol },
+      process.env.JWT_SECRET,
+      { expiresIn: "8h" }
+    );
+
+    res.json({
+      mensaje: "Login con Google exitoso",
+      token,
+      usuario: {
+        nombre:         usuario.nombre,
+        correo:         usuario.correo,
+        region:         usuario.region,
+        rol:            usuario.rol,
+        puntos_totales: usuario.puntos_totales
+      }
+    });
+
+  } catch (error) {
+    console.error("Error autenticando con Google:", error);
+    res.status(401).json({ mensaje: "Token de Google inválido" });
+  }
+});
 // ── Middleware JWT ──────────────────────────
 function verificarJWT(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1];
