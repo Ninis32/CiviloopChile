@@ -21,6 +21,9 @@
     <h2 id="mis-puntos">— Puntos Disponibles</h2>
   </div>
 
+  <!-- 1. CONTENEDOR DONDE SE MUESTRA EL CÓDIGO QR -->
+  <div id="contenedorCanje"></div>
+
   <div id="lista-beneficios">
     <p style="color:#888;font-size:0.85rem">Cargando beneficios...</p>
   </div>
@@ -123,6 +126,16 @@
             origin: { y: 0.6 }
           });
         }
+
+        // 2. DESPLEGAR LA TARJETA DEL CÓDIGO QR GENERADO
+        document.getElementById("contenedorCanje").innerHTML = `
+          <div style="text-align: center; background: #f4fbf6; border: 1px solid #1A5C35; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+            <h3 style="color: #1A5C35; margin-bottom: 5px;">¡Cupón Generado! 🎉</h3>
+            <p style="font-size: 0.8rem; color: #555; margin-bottom: 10px;">Muestra este código QR en el local:</p>
+            <img src="${data.qr_image}" alt="Código QR de Descuento" style="border: 2px solid #1A5C35; border-radius: 8px; max-width: 180px;" />
+            <p style="margin-top: 10px; font-size: 0.9rem;">Código: <strong>${data.codigo_cupon}</strong></p>
+          </div>
+        `;
 
         // Actualizar puntos en localStorage
         usuario.puntos_totales -= puntos
