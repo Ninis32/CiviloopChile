@@ -1285,20 +1285,28 @@ async function cargarRetos() {
         '<tr><td colspan="6" style="text-align:center;color:#aaa">No hay retos registrados. Ejemplo: "Recicla 10kg este mes y gana 200 puntos extra"</td></tr>'
       return
     }
-    document.getElementById("tabla-retos").innerHTML = retosCache.map(r => `
+    document.getElementById("tabla-retos").innerHTML = retosCache.map(r => {
+      const empresa  = r.id_empresa?.nombre || r.id_empresa || "—"
+      const material = r.material || "—"
+      const inicio   = r.fecha_inicio ? r.fecha_inicio.slice(0,10) : ""
+      const fin      = r.fecha_fin    ? r.fecha_fin.slice(0,10)    : ""
+      const vigencia = inicio && fin ? `${inicio}<br>${fin}` : inicio || fin || "—"
+      return `
       <tr>
         <td>${r.nombre}</td>
-        <td>${r.descripcion || "—"}</td>
+        <td>${material}</td>
         <td>${r.meta_kg} kg</td>
+        <td style="font-size:0.78rem">${vigencia}</td>
+        <td>${empresa}</td>
         <td>${r.puntos_premio} pts</td>
         <td><span class="badge ${r.activo?'badge-verde':'badge-rojo'}">${r.activo?'Activo':'Inactivo'}</span></td>
         <td>
-          <button class="btn-accion btn-editar" onclick="editarReto('${r._id}')">Editar</button>
-          <button class="btn-accion btn-bloquear" onclick="toggleReto('${r._id}', ${!r.activo})">${r.activo?'Desactivar':'Activar'}</button>
-          <button class="btn-accion btn-eliminar" onclick="eliminarReto('${r._id}')">Eliminar</button>
+          <button class="btn-accion btn-editar"   onclick="editarReto('${r._id}')">Editar</button>
+          <button class="btn-accion btn-bloquear"  onclick="toggleReto('${r._id}', ${!r.activo})">${r.activo?'Desactivar':'Activar'}</button>
+          <button class="btn-accion btn-eliminar"  onclick="eliminarReto('${r._id}')">Eliminar</button>
         </td>
-      </tr>
-    `).join("")
+      </tr>`
+    }).join("")
   } catch {
     document.getElementById("tabla-retos").innerHTML =
       '<tr><td colspan="6" style="text-align:center;color:#aaa">Error de conexion</td></tr>'
