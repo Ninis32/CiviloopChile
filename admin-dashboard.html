@@ -1286,7 +1286,9 @@ async function cargarRetos() {
       return
     }
     document.getElementById("tabla-retos").innerHTML = retosCache.map(r => {
-      const empresa  = r.id_empresa?.nombre || r.id_empresa || "—"
+      const empresaId = r.id_empresa?._id || r.id_empresa
+      const empresaObj = empresasCache.find(e => e._id === empresaId)
+      const empresa = empresaObj?.nombreEmpresa || empresaObj?.nombre || "—"
       const material = r.material || "—"
       const inicio   = r.fecha_inicio ? r.fecha_inicio.slice(0,10) : ""
       const fin      = r.fecha_fin    ? r.fecha_fin.slice(0,10)    : ""
