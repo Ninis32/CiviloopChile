@@ -310,7 +310,7 @@
       </div>
 
       <div class="card">
-        <div class="card-header"><h3>🏆 Top 5 usuarios con más puntos</h3></div>
+        <div class="card-header"><h3>🏆 Top 5 Ciudadanos con más puntos</h3></div>
         <table>
           <thead>
             <tr><th>#</th><th>Nombre</th><th>Correo</th><th>Puntos</th></tr>
@@ -783,7 +783,7 @@ async function cargarEstadisticas() {
     document.getElementById("stat-kg").textContent = Math.round(totalPuntos / 5)
 
     // Top usuarios
-    const top = [...usuarios].sort((a,b) => b.puntos_totales - a.puntos_totales).slice(0,5)
+    const top = usuarios.filter(u => u.rol ==="ciudadano").sort((a,b) => b.puntos_totales - a.puntos_totales).slice(0,5)
     document.getElementById("tabla-top-usuarios").innerHTML = top.map((u,i) => `
       <tr>
         <td>${["🥇","🥈","🥉","4°","5°"][i]}</td>
