@@ -107,6 +107,10 @@
   // Cargar puntos desde MongoDB
   async function cargarPuntos() {
     try {
+      const token = localStorage.getItem("token");
+      if (!token) { console.error("No hay token. Debes iniciar secion.");
+        return;
+      }
       const res  = await fetch("https://civiloopchile.onrender.com/api/puntos-limpios", {
         headers: { "Authorization": "Bearer " + token }
       })
